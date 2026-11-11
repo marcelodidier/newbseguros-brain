@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NewB Seguros — Central de Acompanhamento</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --brand:        #8073FF;
+    --brand-light:  #EAE8FF;
+    --brand-dark:   #5A4FCC;
+    --ink:          #111827;
+    --ink-muted:    #6B7280;
+    --surface:      #FFFFFF;
+    --surface-2:    #F9FAFB;
+    --border:       #E5E7EB;
+    --success:      #16A34A;
+    --success-bg:   #DCFCE7;
+    --warning:      #D97706;
+    --warning-bg:   #FEF3C7;
+    --danger:       #DC2626;
+    --danger-bg:    #FEE2E2;
+    --info:         #2563EB;
+    --info-bg:      #DBEAFE;
+    --radius:       10px;
+    --radius-sm:    6px;
+    --shadow:       0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+    --shadow-md:    0 4px 12px rgba(0,0,0,.1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Alexandria', system-ui, sans-serif;
+    background: var(--surface-2);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    font-size: 14px;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 220px;
+    min-width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+  }
+
+  .sidebar-logo {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo-mark {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: var(--brand);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 700; font-size: 13px;
+    letter-spacing: -.5px;
+  }
+
+  .logo-text { line-height: 1.2; }
+  .logo-text strong { font-size: 15px; font-weight: 700; color: var(--ink); }
+  .logo-text span { font-size: 11px; color: var(--ink-muted); display: block; }
+
+  .sidebar-nav { padding: 12px 10px; flex: 1; }
+
+  .nav-label {
+    font-size: 10px; font-weight: 600; color: var(--ink-muted);
+    text-transform: uppercase; letter-spacing: .08em;
+    padding: 0 10px; margin: 12px 0 6px;
+  }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 10px; border-radius: var(--radius-sm);
+    cursor: pointer; color: var(--ink-muted);
+    font-size: 13.5px; font-weight: 500;
+    transition: all .15s;
+    text-decoration: none;
+  }
+
+  .nav-item:hover { background: var(--surface-2); color: var(--ink); }
+  .nav-item.active { background: var(--brand-light); color: var(--brand); }
+  .nav-item .nav-badge {
+    margin-left: auto; font-size: 11px; font-weight: 600;
+    background: var(--brand); color: white;
+    padding: 1px 7px; border-radius: 20px; min-width: 20px; text-align: center;
+  }
+  .nav-item.active .nav-badge { background: var(--brand); }
+
+  .sidebar-footer {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--ink-muted);
+  }
+
+  .user-chip {
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .user-avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--brand-light); color: var(--brand);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 11px;
+  }
+
+  /* ── Main ── */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex; align-items: center; gap: 16px;
+  }
+
+  .topbar-title { font-size: 16px; font-weight: 700; flex: 1; }
+  .topbar-sub { font-size: 12px; color: var(--ink-muted); font-weight: 400; margin-left: 8px; }
+
+  .topbar-actions { display: flex; gap: 8px; align-items: center; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: var(--radius-sm);
+    font-family: inherit; font-size: 13px; font-weight: 500;
+    cursor: pointer; border: none; transition: all .15s;
+  }
+  .btn-primary { background: var(--brand); color: white; }
+  .btn-primary:hover { background: var(--brand-dark); }
+  .btn-ghost { background: transparent; color: var(--ink-muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: var(--surface-2); color: var(--ink); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+  .search-bar {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 7px 12px;
+    font-size: 13px; color: var(--ink-muted);
+  }
+  .search-bar input {
+    border: none; background: transparent; outline: none;
+    font-family: inherit; font-size: 13px; color: var(--ink); width: 180px;
+  }
+
+  /* ── Stats row ── */
+  .stats-row {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 1px; background: var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .stat-cell {
+    background: var(--surface);
+    padding: 16px 24px;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .stat-cell:hover { background: var(--surface-2); }
+  .stat-cell.active { background: var(--brand-light); }
+
+  .stat-label {
+    font-size: 11px; font-weight: 600; color: var(--ink-muted);
+    text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px;
+  }
+
+  .stat-value {
+    font-size: 26px; font-weight: 700; line-height: 1;
+    display: flex; align-items: baseline; gap: 8px;
+  }
+
+  .stat-value .stat-unit { font-size: 13px; font-weight: 500; color: var(--ink-muted); }
+
+  .stat-delta {
+    font-size: 11px; font-weight: 500; margin-top: 4px;
+    display: flex; align-items: center; gap: 3px;
+  }
+  .stat-delta.up { color: var(--success); }
+  .stat-delta.down { color: var(--danger); }
+
+  .stat-cell.active .stat-label { color: var(--brand-dark); }
+  .stat-cell.active .stat-value { color: var(--brand); }
+
+  /* ── Content ── */
+  .content { flex: 1; overflow-y: auto; padding: 20px 24px; }
+
+  .section-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .section-title { font-size: 15px; font-weight: 700; }
+
+  .section-filters {
+    display: flex; gap: 6px; margin-left: auto;
+  }
+
+  .filter-chip {
+    padding: 4px 10px; border-radius: 20px;
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    border: 1px solid var(--border); background: white;
+    color: var(--ink-muted); transition: all .15s;
+  }
+  .filter-chip:hover, .filter-chip.active {
+    background: var(--brand); color: white; border-color: var(--brand);
+  }
+
+  /* ── Table ── */
+  .data-table {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    margin-bottom: 24px;
+  }
+
+  .table-wrap { overflow-x: auto; }
+
+  table { width: 100%; border-collapse: collapse; }
+
+  th {
+    text-align: left; padding: 10px 16px;
+    font-size: 11px; font-weight: 600; color: var(--ink-muted);
+    text-transform: uppercase; letter-spacing: .06em;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px; vertical-align: middle;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface-2); }
+
+  .client-name { font-weight: 600; color: var(--ink); }
+  .client-email { font-size: 12px; color: var(--ink-muted); }
+
+  /* Badges */
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 9px; border-radius: 20px;
+    font-size: 11px; font-weight: 600; white-space: nowrap;
+  }
+  .badge-success { background: var(--success-bg); color: var(--success); }
+  .badge-warning { background: var(--warning-bg); color: var(--warning); }
+  .badge-danger  { background: var(--danger-bg);  color: var(--danger);  }
+  .badge-info    { background: var(--info-bg);    color: var(--info);    }
+  .badge-neutral { background: var(--surface-2);  color: var(--ink-muted); border: 1px solid var(--border); }
+
+  .badge-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+  }
+
+  /* Row actions */
+  .row-actions { display: flex; gap: 6px; }
+
+  .action-btn {
+    padding: 4px 10px; border-radius: var(--radius-sm);
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    border: 1px solid var(--border); background: white;
+    color: var(--ink-muted); transition: all .15s;
+    font-family: inherit;
+  }
+  .action-btn:hover { background: var(--brand); color: white; border-color: var(--brand); }
+  .action-btn.primary { background: var(--brand); color: white; border-color: var(--brand); }
+  .action-btn.primary:hover { background: var(--brand-dark); }
+
+  /* Date urgency */
+  .date-urgent { color: var(--danger); font-weight: 600; }
+  .date-soon   { color: var(--warning); font-weight: 600; }
+  .date-ok     { color: var(--success); }
+
+  /* Progress bar */
+  .progress-wrap { display: flex; align-items: center; gap: 8px; }
+  .progress-bar {
+    flex: 1; height: 5px; background: var(--border);
+    border-radius: 3px; overflow: hidden;
+  }
+  .progress-fill { height: 100%; background: var(--brand); border-radius: 3px; }
+  .progress-pct { font-size: 11px; color: var(--ink-muted); width: 28px; text-align: right; }
+
+  /* Reason tag */
+  .reason-tag {
+    display: inline-block;
+    padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 500;
+    background: var(--surface-2); color: var(--ink-muted);
+    border: 1px solid var(--border);
+  }
+
+  /* Valor */
+  .valor { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* Tab sections */
+  .tab-panels { display: none; }
+  .tab-panels.active { display: block; }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center; padding: 48px 24px; color: var(--ink-muted);
+  }
+  .empty-icon { font-size: 32px; margin-bottom: 10px; }
+  .empty-state p { font-size: 13px; }
+
+  /* Pagination */
+  .table-footer {
+    display: flex; align-items: center; padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--ink-muted);
+    gap: 8px;
+  }
+  .table-footer span { flex: 1; }
+
+  .pag-btn {
+    padding: 4px 10px; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); background: white;
+    cursor: pointer; font-size: 12px; font-family: inherit;
+    color: var(--ink-muted);
+  }
+  .pag-btn:hover { background: var(--surface-2); }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <div class="logo-icon">nB</div>
+      <div class="logo-text">
+        <strong>newB</strong>
+        <span>seguros</span>
+      </div>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-label">Central</div>
+    <a class="nav-item active" onclick="showTab('all')">
+      <span>◉</span> Dashboard
+      <span class="nav-badge">47</span>
+    </a>
+
+    <div class="nav-label">Carteira</div>
+    <a class="nav-item" onclick="showTab('renovacoes')">
+      <span>↻</span> Renovações
+      <span class="nav-badge" style="background:#D97706">18</span>
+    </a>
+    <a class="nav-item" onclick="showTab('retomadas')">
+      <span>◎</span> Retomadas
+      <span class="nav-badge" style="background:#DC2626">12</span>
+    </a>
+    <a class="nav-item" onclick="showTab('novos')">
+      <span>✦</span> Novos Clientes
+      <span class="nav-badge" style="background:#16A34A">17</span>
+    </a>
+
+    <div class="nav-label">Gestão</div>
+    <a class="nav-item"><span>📋</span> Apólices</a>
+    <a class="nav-item"><span>📊</span> Relatórios</a>
+    <a class="nav-item"><span>⚙</span> Configurações</a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="user-chip">
+      <div class="user-avatar">MD</div>
+      <div>
+        <div style="font-weight:600;color:var(--ink);font-size:13px">Marcelo Didier</div>
+        <div>Administrador</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-title">
+      Central de Acompanhamento
+      <span class="topbar-sub">Atualizado hoje às 09/11/2026</span>
+    </div>
+    <div class="topbar-actions">
+      <div class="search-bar">
+        <span>🔍</span>
+        <input type="text" placeholder="Buscar cliente, apólice..." oninput="filterTable(this.value)">
+      </div>
+      <button class="btn btn-ghost">↓ Exportar</button>
+      <button class="btn btn-primary">+ Nova Solicitação</button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-cell active" onclick="showTab('all');setStatActive(this)">
+      <div class="stat-label">Total Ativo</div>
+      <div class="stat-value">47 <span class="stat-unit">pendências</span></div>
+      <div class="stat-delta up">↑ 8 esta semana</div>
+    </div>
+    <div class="stat-cell" onclick="showTab('renovacoes');setStatActive(this)">
+      <div class="stat-label">Renovações</div>
+      <div class="stat-value" style="color:var(--warning)">18 <span class="stat-unit">clientes</span></div>
+      <div class="stat-delta down">↓ 5 vencem em 30 dias</div>
+    </div>
+    <div class="stat-cell" onclick="showTab('retomadas');setStatActive(this)">
+      <div class="stat-label">Retomadas</div>
+      <div class="stat-value" style="color:var(--danger)">12 <span class="stat-unit">inativos</span></div>
+      <div class="stat-delta">◉ 4 em contato</div>
+    </div>
+    <div class="stat-cell" onclick="showTab('novos');setStatActive(this)">
+      <div class="stat-label">Novos Clientes</div>
+      <div class="stat-value" style="color:var(--success)">17 <span class="stat-unit">solicitações</span></div>
+      <div class="stat-delta up">↑ 3 hoje</div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- RENOVAÇÕES -->
+    <div id="tab-renovacoes" class="tab-panels active">
+      <div class="section-header">
+        <div class="section-title">↻ Renovações de Carteira</div>
+        <div class="section-filters">
+          <span class="filter-chip active" onclick="filterStatus('renovacoes','all',this)">Todos (18)</span>
+          <span class="filter-chip" onclick="filterStatus('renovacoes','urgente',this)">🔴 Urgente (5)</span>
+          <span class="filter-chip" onclick="filterStatus('renovacoes','breve',this)">🟡 Em breve (8)</span>
+          <span class="filter-chip" onclick="filterStatus('renovacoes','ok',this)">🟢 OK (5)</span>
+        </div>
+      </div>
+
+      <div class="data-table">
+        <div class="table-wrap">
+          <table id="tbl-renovacoes">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Seguro</th>
+                <th>Seguradora</th>
+                <th>Vencimento</th>
+                <th>Prêmio / ano</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr data-status="urgente">
+                <td><div class="client-name">Carlos Ferreira</div><div class="client-email">carlos@empresa.com.br</div></td>
+                <td><span class="badge badge-info">Auto</span></td>
+                <td>Porto Seguro</td>
+                <td class="date-urgent">12/11/2026 — 3 dias</td>
+                <td class="valor">R$ 4.200</td>
+                <td><span class="badge badge-danger"><span class="badge-dot"></span>Urgente</span></td>
+                <td><div class="row-actions"><button class="action-btn primary">Contatar</button><button class="action-btn">Ver</button></div></td>
+              </tr>
+              <tr data-status="urgente">
+                <td><div class="client-name">Mariana Souza</div><div class="client-email">mari@gmail.com</div></td>
+                <td><span class="badge badge-info">Vida</span></td>
+                <td>SulAmérica</td>
+                <td class="date-urgent">14/11/2026 — 5 dias</td>
+                <td class="valor">R$ 2.800</td>
+                <td><span class="badge badge-danger"><span class="badge-dot"></span>Urgente</span></td>
+                <td><div class="row-actions"><button class="action-btn primary">Contatar</button><button class="action-btn">Ver</button></div></td>
+              </tr>
+              <tr data-status="urgente">
+                <td><div class="client-name">Construtora RB Ltda</div><div class="client-email">adm@construtorb.com.br</div></td>
+                <td><span class="badge badge-info">Empresarial</span></td>
+                <td>Zurich</td>
+                <td class="date-urgent">15/11/2026 — 6 dias</td>
+                <td class="valor">R$ 18.500</td>
+                <td><span class="badge badge-danger"><span class="badge-dot"></span>Urgente</span></td>
+                <td><div class="row-actions"><button class="action-btn primary">Contatar</button><button class="action-btn">Ver</button></div></td>
+              </tr>
+              <tr data-status="breve">
+                <td><div class="client-name">Fernanda Lima</div><div class="client-email">fe.lima@hotmail.com</div></td>
+                <td><span class="badge badge-info">Residência</span></td>
+                <td>Bradesco Seguros</td>
+                <td class="date-soon">28/11/2026 — 19 dias</td>
+                <td class="valor">R$ 1.200</td>
+                <td><span class="badge badge-warning"><span class="badge-dot"></span>Em breve</span></td>
+                <td><div class="row-actions"><button class="action-btn">Enviar proposta</button><button class="action-btn">Ver</button></div></td>
+              </tr>
+              <tr data-status="breve">
+                <td><div class="client-name">Ricardo Alves</div><div class="client-email">ricardoa@empresa.com</div></td>
+                <td><span class="badge badge-info">Saúde</span></td>
+                <td>Amil</td>
+                <td class="date-soon">02/12/2026 — 23 dias</td>
+                <td class="valor">R$ 36.000</td>
+                <td><span class="badge badge-warning"><span class="badge-dot"></span>Em breve</span></td>
+                <td><div class="row-actions"><button class="action-btn">Enviar proposta</button><button class="action-btn">Ver</button></div></td>
+              </tr>
+              <tr data-status="breve">
+                <td><div class="client-name">Ana Paula Ramos</div><div class="client-email">anapaula@gmail.com</div></td>
+                <td><span class="badge badge-info">Auto</span></td>
+                <td>Allianz</td>
+                <td class="date-soon">05/12/2026 — 26 dias</td>
+                <td class="valor">R$ 3.600</td>
+                <td><span class="badge badge-warning"><span class="badge-dot"></span>Em breve</span></td>
+                <td><div class="row-actions"><button class="action-btn">Enviar proposta</button><button class="action-btn">Ver</button></div></td>
+              </tr>
+              <tr data-status="ok">
+                <td><div class="client-name">Tech Soluções S.A.</div><div class="client-email">rh@techsolucoes.com</div></td>
+                <td><span class="badge badge-info">D&O</span></td>
+                <td>Chubb</td>
+                <td class="date-ok">15/01/2027 — 67 dias</td>
+                <td class="valor">R$ 52.000</td>
+                <td><span class="badge badge-success"><span class="badge-dot"></span>Em dia</span></td>
+                <td><div class="row-actions"><button class="action-btn">Agendar</button><button class="action-btn">Ver</button></div></td>
+              </tr>
+              <tr data-status="ok">
+                <td><div class="client-name">Gustavo Mendes</div><div class="client-email">gustavom@outlook.com</div></td>
+                <td><span class="badge badge-info">Moto</span></td>
+                <td>Tokio Marine</td>
+                <td class="date-ok">22/01/2027 — 74 dias</td>
+                <td class="valor">R$ 980</td>
+                <td><span class="badge badge-success"><span class="badge-dot"></span>Em dia</span></td>
+                <td><div class="row-actions"><button class="action-btn">Agendar</button><button class="action-btn">Ver</button></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-footer">
+          <span>Exibindo 8 de 18 renovações</span>
+          <button class="pag-btn">← Anterior</button>
+          <button class="pag-btn">Próximo →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RETOMADAS -->
+    <div id="tab-retomadas" class="tab-panels">
+      <div class="section-header">
+        <div class="section-title">◎ Retomadas — Clientes Inativos</div>
+        <div class="section-filters">
+          <span class="filter-chip active">Todos (12)</span>
+          <span class="filter-chip">Em contato (4)</span>
+          <span class="filter-chip">Sem resposta (5)</span>
+          <span class="filter-chip">Perdido (3)</span>
+        </div>
+      </div>
+
+      <div class="data-table">
+        <div class="table-wrap">
+          <table id="tbl-retomadas">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Último Seguro</th>
+                <th>Venceu em</th>
+                <th>Motivo saída</th>
+                <th>Último contato</th>
+                <th>Probabilidade</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><div class="client-name">Paulo Rodrigues</div><div class="client-email">paulo.r@empresa.com.br</div></td>
+                <td><span class="badge badge-neutral">Auto</span></td>
+                <td>Fev/2026</td>
+                <td><span class="reason-tag">Preço alto</span></td>
+                <td>03/11/2026</td>
+                <td>
+                  <div class="progress-wrap">
+                    <div class="progress-bar"><div class="progress-fill" style="width:72%"></div></div>
+                    <span class="progress-pct">72%</span>
+                  </div>
+                </td>
+                <td><span class="badge badge-info"><span class="badge-dot"></span>Em contato</span></td>
+                <td><div class="row-actions"><button class="action-btn primary">Retomar</button><button class="action-btn">Histórico</button></div></td>
+              </tr>
+              <tr>
+                <td><div class="client-name">Beatriz Costa</div><div class="client-email">beatrizcosta@gmail.com</div></td>
+                <td><span class="badge badge-neutral">Residência</span></td>
+                <td>Jan/2026</td>
+                <td><span class="reason-tag">Mudança</span></td>
+                <td>28/10/2026</td>
+                <td>
+                  <div class="progress-wrap">
+                    <div class="progress-bar"><div class="progress-fill" style="width:58%"></div></div>
+                    <span class="progress-pct">58%</span>
+                  </div>
+                </td>
+                <td><span class="badge badge-info"><span class="badge-dot"></span>Em contato</span></td>
+                <td><div class="row-actions"><button class="action-btn primary">Retomar</button><button class="action-btn">Histórico</button></div></td>
+              </tr>
+              <tr>
+                <td><div class="client-name">Importadora XM Ltda</div><div class="client-email">financeiro@xm.com.br</div></td>
+                <td><span class="badge badge-neutral">Transporte</span></td>
+                <td>Mar/2026</td>
+                <td><span class="reason-tag">Concorrente</span></td>
+                <td>15/10/2026</td>
+                <td>
+                  <div class="progress-wrap">
+                    <div class="progress-bar"><div class="progress-fill" style="width:40%"></div></div>
+                    <span class="progress-pct">40%</span>
+                  </div>
+                </td>
+                <td><span class="badge badge-warning"><span class="badge-dot"></span>Sem resposta</span></td>
+                <td><div class="row-actions"><button class="action-btn">Follow-up</button><button class="action-btn">Histórico</button></div></td>
+              </tr>
+              <tr>
+                <td><div class="client-name">Diego Martins</div><div class="client-email">diegomartins@outlook.com</div></td>
+                <td><span class="badge badge-neutral">Vida</span></td>
+                <td>Abr/2026</td>
+                <td><span class="reason-tag">Preço alto</span></td>
+                <td>—</td>
+                <td>
+                  <div class="progress-wrap">
+                    <div class="progress-bar"><div class="progress-fill" style="width:25%"></div></div>
+                    <span class="progress-pct">25%</span>
+                  </div>
+                </td>
+                <td><span class="badge badge-warning"><span class="badge-dot"></span>Sem resposta</span></td>
+                <td><div class="row-actions"><button class="action-btn">Contatar</button><button class="action-btn">Histórico</button></div></td>
+              </tr>
+              <tr>
+                <td><div class="client-name">Clínica São Lucas</div><div class="client-email">adm@sãolucas.med.br</div></td>
+                <td><span class="badge badge-neutral">RC Profissional</span></td>
+                <td>Dez/2025</td>
+                <td><span class="reason-tag">Encerrou atividade</span></td>
+                <td>—</td>
+                <td>
+                  <div class="progress-wrap">
+                    <div class="progress-bar"><div class="progress-fill" style="width:8%; background:#DC2626"></div></div>
+                    <span class="progress-pct">8%</span>
+                  </div>
+                </td>
+                <td><span class="badge badge-danger"><span class="badge-dot"></span>Perdido</span></td>
+                <td><div class="row-actions"><button class="action-btn">Arquivar</button><button class="action-btn">Ver</button></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-footer">
+          <span>Exibindo 5 de 12 inativos</span>
+          <button class="pag-btn">← Anterior</button>
+          <button class="pag-btn">Próximo →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- NOVOS -->
+    <div id="tab-novos" class="tab-panels">
+      <div class="section-header">
+        <div class="section-title">✦ Novos Clientes — Solicitações</div>
+        <div class="section-filters">
+          <span class="filter-chip active">Todos (17)</span>
+          <span class="filter-chip">🟡 Aguardando (9)</span>
+          <span class="filter-chip">🟢 Em cotação (5)</span>
+          <span class="filter-chip">✓ Fechados (3)</span>
+        </div>
+      </div>
+
+      <div class="data-table">
+        <div class="table-wrap">
+          <table id="tbl-novos">
+            <thead>
+              <tr>
+                <th>Solicitante</th>
+                <th>Tipo de Seguro</th>
+                <th>Canal</th>
+                <th>Data Entrada</th>
+                <th>Valor estimado</th>
+                <th>Responsável</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><div class="client-name">Juliana Pereira</div><div class="client-email">ju.pereira@gmail.com</div></td>
+                <td><span class="badge badge-info">Auto</span></td>
+                <td>Site</td>
+                <td>09/11/2026 🆕</td>
+                <td class="valor">~R$ 3.800</td>
+                <td>Barbara</td>
+                <td><span class="badge badge-warning"><span class="badge-dot"></span>Aguardando</span></td>
+                <td><div class="row-actions"><button class="action-btn primary">Iniciar cotação</button><button class="action-btn">Ver</button></div></td>
+              </tr>
+              <tr>
+                <td><div class="client-name">Marcos Vinicius</div><div class="client-email">marcosv@empresa.com</div></td>
+                <td><span class="badge badge-info">Saúde Empresarial</span></td>
+                <td>WhatsApp</td>
+                <td>09/11/2026 🆕</td>
+                <td class="valor">~R$ 48.000</td>
+                <td>Newton</td>
+                <td><span class="badge badge-warning"><span class="badge-dot"></span>Aguardando</span></td>
+                <td><div class="row-actions"><button class="action-btn primary">Iniciar cotação</button><button class="action-btn">Ver</button></div></td>
+              </tr>
+              <tr>
+                <td><div class="client-name">Loja Moda Fácil</div><div class="client-email">gerencia@modafacil.com.br</div></td>
+                <td><span class="badge badge-info">Empresarial</span></td>
+                <td>Indicação</td>
+                <td>08/11/2026</td>
+                <td class="valor">~R$ 12.000</td>
+                <td>Comercial</td>
+                <td><span class="badge badge-info"><span class="badge-dot"></span>Em cotação</span></td>
+                <td><div class="row-actions"><button class="action-btn">Enviar proposta</button><button class="action-btn">Ver</button></div></td>
+              </tr>
+              <tr>
+                <td><div class="client-name">Renata Oliveira</div><div class="client-email">renata.oli@hotmail.com</div></td>
+                <td><span class="badge badge-info">Vida</span></td>
+                <td>Email</td>
+                <td>07/11/2026</td>
+                <td class="valor">~R$ 1.800</td>
+                <td>Barbara</td>
+                <td><span class="badge badge-info"><span class="badge-dot"></span>Em cotação</span></td>
+                <td><div class="row-actions"><button class="action-btn">Enviar proposta</button><button class="action-btn">Ver</button></div></td>
+              </tr>
+              <tr>
+                <td><div class="client-name">Construtora Braga</div><div class="client-email">obras@braga.eng.br</div></td>
+                <td><span class="badge badge-info">Riscos Engenharia</span></td>
+                <td>Site</td>
+                <td>05/11/2026</td>
+                <td class="valor">~R$ 85.000</td>
+                <td>Newton</td>
+                <td><span class="badge badge-success"><span class="badge-dot"></span>Fechado ✓</span></td>
+                <td><div class="row-actions"><button class="action-btn">Apólice</button><button class="action-btn">Ver</button></div></td>
+              </tr>
+              <tr>
+                <td><div class="client-name">Felipe Cardoso</div><div class="client-email">felipe.c@gmail.com</div></td>
+                <td><span class="badge badge-info">Bike</span></td>
+                <td>Instagram</td>
+                <td>04/11/2026</td>
+                <td class="valor">~R$ 650</td>
+                <td>Suporte</td>
+                <td><span class="badge badge-success"><span class="badge-dot"></span>Fechado ✓</span></td>
+                <td><div class="row-actions"><button class="action-btn">Apólice</button><button class="action-btn">Ver</button></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-footer">
+          <span>Exibindo 6 de 17 solicitações</span>
+          <button class="pag-btn">← Anterior</button>
+          <button class="pag-btn">Próximo →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALL (padrão) — mostra os três -->
+    <div id="tab-all" class="tab-panels" style="display:none"></div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<script>
+  // Nav ativo
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', function() {
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      this.classList.add('active');
+    });
+  });
+
+  function showTab(tab) {
+    // Esconde todos
+    document.querySelectorAll('.tab-panels').forEach(p => p.style.display = 'none');
+    if (tab === 'all') {
+      // Mostra os três
+      document.getElementById('tab-renovacoes').style.display = 'block';
+      document.getElementById('tab-retomadas').style.display = 'block';
+      document.getElementById('tab-novos').style.display = 'block';
+    } else {
+      const el = document.getElementById('tab-' + tab);
+      if (el) el.style.display = 'block';
+    }
+  }
+
+  function setStatActive(el) {
+    document.querySelectorAll('.stat-cell').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  function filterStatus(tab, status, chip) {
+    document.querySelectorAll(`#tab-${tab} .filter-chip`).forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    const rows = document.querySelectorAll(`#tbl-${tab} tbody tr`);
+    rows.forEach(row => {
+      if (status === 'all') {
+        row.style.display = '';
+      } else {
+        row.style.display = row.dataset.status === status ? '' : 'none';
+      }
+    });
+  }
+
+  function filterTable(query) {
+    const q = query.toLowerCase();
+    document.querySelectorAll('tbody tr').forEach(row => {
+      row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  }
+
+  // Init: mostra todos
+  showTab('all');
+</script>
+</body>
+</html>
