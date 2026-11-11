@@ -232,7 +232,49 @@ def list_emails(caixa: Optional[str] = None, lido: Optional[int] = None, limit: 
     db.close()
     return {"items": rows, "total": len(rows)}
 
-# ── Health ────────────────────────────────────────────────────────
+import secrets
+from datetime import datetime, timedelta
+
+# ── Auth ──────────────────────────────────────────────────────────
+
+USERS = {
+    "marcelo": "NewB@2026",
+    "nane":    "NewB@2026",
+    "newton":  "NewB@2026",
+}
+TOKENS: dict = {}  # token → {user, expires}
+
+class LoginBody(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/auth/login")
+def login(body: LoginBody):
+    pw = USERS.get(body.username.lower())
+    if not pw or pw != body.password:
+        raise HTTPException(401, "Usuário ou senha inválidos")
+    token = secrets.token_hex(32)
+    TOKENS[token] = {
+        "user": body.username,
+        "expires": (datetime.now() + timedelta(hours=12)).isoformat()
+    }
+    return {"token": token, "user": body.username, "expires_in": 43200}
+
+@app.post("/api/auth/logout")
+def logout(authorization: str = None):
+    token = (authorization or "").replace("Bearer ", "")
+    TOKENS.pop(token, None)
+    return {"ok": True}
+
+@app.get("/api/auth/me")
+def me(authorization: str = None):
+    token = (authorization or "").replace("Bearer ", "")
+    data = TOKENS.get(token)
+    if not data or datetime.fromisoformat(data["expires"]) < datetime.now():
+        raise HTTPException(401, "Token inválido ou expirado")
+    return {"user": data["user"]}
+
+
 
 @app.get("/api/health")
 def health():
