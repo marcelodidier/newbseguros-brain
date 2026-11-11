@@ -4,6 +4,136 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NewB Seguros — Central de Acompanhamento</title>
+<script>
+// ── API Config ──────────────────────────────────────────────────
+const API = 'http://localhost:8000/api';
+
+async function fetchAPI(path) {
+  try {
+    const r = await fetch(API + path);
+    return r.ok ? r.json() : null;
+  } catch { return null; }
+}
+
+async function loadStats() {
+  const stats = await fetchAPI('/stats');
+  if (!stats) return;
+  // Atualiza stat cells
+  document.querySelector('[data-stat="total"]')?.querySelector('.stat-value')
+    ?.childNodes[0] && (document.querySelector('[data-stat="total"] .stat-value').childNodes[0].textContent =
+      stats.cotacoes.total + stats.renovacoes.total + stats.retomadas.total + ' ');
+  document.querySelector('[data-stat="renovacoes"] .stat-value')?.childNodes[0] &&
+    (document.querySelector('[data-stat="renovacoes"] .stat-value').childNodes[0].textContent = stats.renovacoes.total + ' ');
+  document.querySelector('[data-stat="renovacoes"] .stat-delta').textContent =
+    `↓ ${stats.renovacoes.urgente} vencem em 30 dias`;
+  document.querySelector('[data-stat="retomadas"] .stat-value')?.childNodes[0] &&
+    (document.querySelector('[data-stat="retomadas"] .stat-value').childNodes[0].textContent = stats.retomadas.total + ' ');
+  document.querySelector('[data-stat="novos"] .stat-value')?.childNodes[0] &&
+    (document.querySelector('[data-stat="novos"] .stat-value').childNodes[0].textContent = stats.cotacoes.total + ' ');
+  document.querySelector('[data-stat="novos"] .stat-delta').textContent =
+    `↑ ${stats.cotacoes.aguardando} aguardando`;
+}
+
+async function loadRenovacoes() {
+  const data = await fetchAPI('/renovacoes?limit=20');
+  if (!data) return;
+  const tbody = document.querySelector('#tbl-renovacoes tbody');
+  if (!tbody || !data.items?.length) return;
+  tbody.innerHTML = data.items.map(r => {
+    const urg = r.urgencia === 'urgente' ? '🔴' : r.urgencia === 'breve' ? '🟡' : '🟢';
+    const dateClass = r.urgencia === 'urgente' ? 'date-urgent' : r.urgencia === 'breve' ? 'date-soon' : 'date-ok';
+    const statusBadge = r.urgencia === 'urgente'
+      ? '<span class="badge badge-danger"><span class="badge-dot"></span>Urgente</span>'
+      : r.urgencia === 'breve'
+      ? '<span class="badge badge-warning"><span class="badge-dot"></span>Em breve</span>'
+      : '<span class="badge badge-success"><span class="badge-dot"></span>Em dia</span>';
+    return `<tr data-status="${r.urgencia}">
+      <td><div class="client-name">${r.cliente_nome}</div><div class="client-email">${r.cliente_email||''}</div></td>
+      <td><span class="badge badge-info">${r.tipo_seguro}</span></td>
+      <td>${r.seguradora||'—'}</td>
+      <td class="${dateClass}">${r.vencimento}</td>
+      <td class="valor">${r.premio_anual ? 'R$ ' + r.premio_anual.toLocaleString('pt-BR') : '—'}</td>
+      <td>${statusBadge}</td>
+      <td><div class="row-actions"><button class="action-btn primary">Contatar</button><button class="action-btn">Ver</button></div></td>
+    </tr>`;
+  }).join('');
+}
+
+async function loadCotacoes() {
+  const data = await fetchAPI('/cotacoes?limit=20');
+  if (!data) return;
+  const tbody = document.querySelector('#tbl-novos tbody');
+  if (!tbody || !data.items?.length) return;
+  tbody.innerHTML = data.items.map(c => {
+    const statusMap = {
+      aguardando: '<span class="badge badge-warning"><span class="badge-dot"></span>Aguardando</span>',
+      em_cotacao: '<span class="badge badge-info"><span class="badge-dot"></span>Em cotação</span>',
+      proposta_enviada: '<span class="badge badge-info"><span class="badge-dot"></span>Proposta enviada</span>',
+      fechado: '<span class="badge badge-success"><span class="badge-dot"></span>Fechado ✓</span>',
+      perdido: '<span class="badge badge-danger"><span class="badge-dot"></span>Perdido</span>',
+    };
+    return `<tr>
+      <td><div class="client-name">${c.cliente_nome}</div></td>
+      <td><span class="badge badge-info">${c.tipo_seguro}</span></td>
+      <td>${c.canal||'—'}</td>
+      <td>${c.criado_em?.split(' ')[0]||'—'}</td>
+      <td class="valor">${c.valor_estimado ? '~R$ ' + c.valor_estimado.toLocaleString('pt-BR') : '—'}</td>
+      <td>${c.responsavel||'—'}</td>
+      <td>${statusMap[c.status] || c.status}</td>
+      <td><div class="row-actions">
+        <button class="action-btn primary" onclick="updateCotacao(${c.id},'em_cotacao')">Iniciar</button>
+        <button class="action-btn">Ver</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+async function loadRetomadas() {
+  const data = await fetchAPI('/retomadas?limit=20');
+  if (!data) return;
+  const tbody = document.querySelector('#tbl-retomadas tbody');
+  if (!tbody || !data.items?.length) return;
+  tbody.innerHTML = data.items.map(r => {
+    const statusMap = {
+      em_contato: '<span class="badge badge-info"><span class="badge-dot"></span>Em contato</span>',
+      sem_contato: '<span class="badge badge-warning"><span class="badge-dot"></span>Sem resposta</span>',
+      perdido: '<span class="badge badge-danger"><span class="badge-dot"></span>Perdido</span>',
+      recuperado: '<span class="badge badge-success"><span class="badge-dot"></span>Recuperado</span>',
+    };
+    return `<tr>
+      <td><div class="client-name">${r.cliente_nome}</div><div class="client-email">${r.cliente_email||''}</div></td>
+      <td><span class="badge badge-neutral">${r.ultimo_seguro||'—'}</span></td>
+      <td>${r.venceu_em||'—'}</td>
+      <td><span class="reason-tag">${r.motivo_saida||'—'}</span></td>
+      <td>${r.ultimo_contato||'—'}</td>
+      <td>
+        <div class="progress-wrap">
+          <div class="progress-bar"><div class="progress-fill" style="width:${r.probabilidade||0}%"></div></div>
+          <span class="progress-pct">${r.probabilidade||0}%</span>
+        </div>
+      </td>
+      <td>${statusMap[r.status] || r.status}</td>
+      <td><div class="row-actions"><button class="action-btn primary">Retomar</button></div></td>
+    </tr>`;
+  }).join('');
+}
+
+async function updateCotacao(id, status) {
+  await fetch(`${API}/cotacoes/${id}?status=${status}`, {method:'PATCH'});
+  loadCotacoes();
+  loadStats();
+}
+
+// Carrega tudo ao iniciar e a cada 60s
+async function loadAll() {
+  await Promise.all([loadStats(), loadRenovacoes(), loadCotacoes(), loadRetomadas()]);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadAll();
+  setInterval(loadAll, 60000);
+});
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
