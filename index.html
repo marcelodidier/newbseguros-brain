@@ -2,958 +2,335 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NewB Seguros — Central de Acompanhamento</title>
-<script>
-// ── API Config ──────────────────────────────────────────────────
-const API = 'http://localhost:8000/api';
-
-async function fetchAPI(path) {
-  try {
-    const r = await fetch(API + path);
-    return r.ok ? r.json() : null;
-  } catch { return null; }
-}
-
-async function loadStats() {
-  const stats = await fetchAPI('/stats');
-  if (!stats) return;
-  // Atualiza stat cells
-  document.querySelector('[data-stat="total"]')?.querySelector('.stat-value')
-    ?.childNodes[0] && (document.querySelector('[data-stat="total"] .stat-value').childNodes[0].textContent =
-      stats.cotacoes.total + stats.renovacoes.total + stats.retomadas.total + ' ');
-  document.querySelector('[data-stat="renovacoes"] .stat-value')?.childNodes[0] &&
-    (document.querySelector('[data-stat="renovacoes"] .stat-value').childNodes[0].textContent = stats.renovacoes.total + ' ');
-  document.querySelector('[data-stat="renovacoes"] .stat-delta').textContent =
-    `↓ ${stats.renovacoes.urgente} vencem em 30 dias`;
-  document.querySelector('[data-stat="retomadas"] .stat-value')?.childNodes[0] &&
-    (document.querySelector('[data-stat="retomadas"] .stat-value').childNodes[0].textContent = stats.retomadas.total + ' ');
-  document.querySelector('[data-stat="novos"] .stat-value')?.childNodes[0] &&
-    (document.querySelector('[data-stat="novos"] .stat-value').childNodes[0].textContent = stats.cotacoes.total + ' ');
-  document.querySelector('[data-stat="novos"] .stat-delta').textContent =
-    `↑ ${stats.cotacoes.aguardando} aguardando`;
-}
-
-async function loadRenovacoes() {
-  const data = await fetchAPI('/renovacoes?limit=20');
-  if (!data) return;
-  const tbody = document.querySelector('#tbl-renovacoes tbody');
-  if (!tbody || !data.items?.length) return;
-  tbody.innerHTML = data.items.map(r => {
-    const urg = r.urgencia === 'urgente' ? '🔴' : r.urgencia === 'breve' ? '🟡' : '🟢';
-    const dateClass = r.urgencia === 'urgente' ? 'date-urgent' : r.urgencia === 'breve' ? 'date-soon' : 'date-ok';
-    const statusBadge = r.urgencia === 'urgente'
-      ? '<span class="badge badge-danger"><span class="badge-dot"></span>Urgente</span>'
-      : r.urgencia === 'breve'
-      ? '<span class="badge badge-warning"><span class="badge-dot"></span>Em breve</span>'
-      : '<span class="badge badge-success"><span class="badge-dot"></span>Em dia</span>';
-    return `<tr data-status="${r.urgencia}">
-      <td><div class="client-name">${r.cliente_nome}</div><div class="client-email">${r.cliente_email||''}</div></td>
-      <td><span class="badge badge-info">${r.tipo_seguro}</span></td>
-      <td>${r.seguradora||'—'}</td>
-      <td class="${dateClass}">${r.vencimento}</td>
-      <td class="valor">${r.premio_anual ? 'R$ ' + r.premio_anual.toLocaleString('pt-BR') : '—'}</td>
-      <td>${statusBadge}</td>
-      <td><div class="row-actions"><button class="action-btn primary">Contatar</button><button class="action-btn">Ver</button></div></td>
-    </tr>`;
-  }).join('');
-}
-
-async function loadCotacoes() {
-  const data = await fetchAPI('/cotacoes?limit=20');
-  if (!data) return;
-  const tbody = document.querySelector('#tbl-novos tbody');
-  if (!tbody || !data.items?.length) return;
-  tbody.innerHTML = data.items.map(c => {
-    const statusMap = {
-      aguardando: '<span class="badge badge-warning"><span class="badge-dot"></span>Aguardando</span>',
-      em_cotacao: '<span class="badge badge-info"><span class="badge-dot"></span>Em cotação</span>',
-      proposta_enviada: '<span class="badge badge-info"><span class="badge-dot"></span>Proposta enviada</span>',
-      fechado: '<span class="badge badge-success"><span class="badge-dot"></span>Fechado ✓</span>',
-      perdido: '<span class="badge badge-danger"><span class="badge-dot"></span>Perdido</span>',
-    };
-    return `<tr>
-      <td><div class="client-name">${c.cliente_nome}</div></td>
-      <td><span class="badge badge-info">${c.tipo_seguro}</span></td>
-      <td>${c.canal||'—'}</td>
-      <td>${c.criado_em?.split(' ')[0]||'—'}</td>
-      <td class="valor">${c.valor_estimado ? '~R$ ' + c.valor_estimado.toLocaleString('pt-BR') : '—'}</td>
-      <td>${c.responsavel||'—'}</td>
-      <td>${statusMap[c.status] || c.status}</td>
-      <td><div class="row-actions">
-        <button class="action-btn primary" onclick="updateCotacao(${c.id},'em_cotacao')">Iniciar</button>
-        <button class="action-btn">Ver</button>
-      </div></td>
-    </tr>`;
-  }).join('');
-}
-
-async function loadRetomadas() {
-  const data = await fetchAPI('/retomadas?limit=20');
-  if (!data) return;
-  const tbody = document.querySelector('#tbl-retomadas tbody');
-  if (!tbody || !data.items?.length) return;
-  tbody.innerHTML = data.items.map(r => {
-    const statusMap = {
-      em_contato: '<span class="badge badge-info"><span class="badge-dot"></span>Em contato</span>',
-      sem_contato: '<span class="badge badge-warning"><span class="badge-dot"></span>Sem resposta</span>',
-      perdido: '<span class="badge badge-danger"><span class="badge-dot"></span>Perdido</span>',
-      recuperado: '<span class="badge badge-success"><span class="badge-dot"></span>Recuperado</span>',
-    };
-    return `<tr>
-      <td><div class="client-name">${r.cliente_nome}</div><div class="client-email">${r.cliente_email||''}</div></td>
-      <td><span class="badge badge-neutral">${r.ultimo_seguro||'—'}</span></td>
-      <td>${r.venceu_em||'—'}</td>
-      <td><span class="reason-tag">${r.motivo_saida||'—'}</span></td>
-      <td>${r.ultimo_contato||'—'}</td>
-      <td>
-        <div class="progress-wrap">
-          <div class="progress-bar"><div class="progress-fill" style="width:${r.probabilidade||0}%"></div></div>
-          <span class="progress-pct">${r.probabilidade||0}%</span>
-        </div>
-      </td>
-      <td>${statusMap[r.status] || r.status}</td>
-      <td><div class="row-actions"><button class="action-btn primary">Retomar</button></div></td>
-    </tr>`;
-  }).join('');
-}
-
-async function updateCotacao(id, status) {
-  await fetch(`${API}/cotacoes/${id}?status=${status}`, {method:'PATCH'});
-  loadCotacoes();
-  loadStats();
-}
-
-// Carrega tudo ao iniciar e a cada 60s
-async function loadAll() {
-  await Promise.all([loadStats(), loadRenovacoes(), loadCotacoes(), loadRetomadas()]);
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  loadAll();
-  setInterval(loadAll, 60000);
-});
-</script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#8073FF">
+<title>NewB Seguros</title>
 <link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --brand:        #8073FF;
-    --brand-light:  #EAE8FF;
-    --brand-dark:   #5A4FCC;
-    --ink:          #111827;
-    --ink-muted:    #6B7280;
-    --surface:      #FFFFFF;
-    --surface-2:    #F9FAFB;
-    --border:       #E5E7EB;
-    --success:      #16A34A;
-    --success-bg:   #DCFCE7;
-    --warning:      #D97706;
-    --warning-bg:   #FEF3C7;
-    --danger:       #DC2626;
-    --danger-bg:    #FEE2E2;
-    --info:         #2563EB;
-    --info-bg:      #DBEAFE;
-    --radius:       10px;
-    --radius-sm:    6px;
-    --shadow:       0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
-    --shadow-md:    0 4px 12px rgba(0,0,0,.1);
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    font-family: 'Alexandria', system-ui, sans-serif;
-    background: var(--surface-2);
-    color: var(--ink);
-    min-height: 100vh;
-    display: flex;
-    font-size: 14px;
-  }
-
-  /* ── Sidebar ── */
-  .sidebar {
-    width: 220px;
-    min-width: 220px;
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    position: sticky;
-    top: 0;
-  }
-
-  .sidebar-logo {
-    padding: 20px 20px 16px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .logo-mark {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .logo-icon {
-    width: 36px; height: 36px;
-    background: var(--brand);
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    color: white; font-weight: 700; font-size: 13px;
-    letter-spacing: -.5px;
-  }
-
-  .logo-text { line-height: 1.2; }
-  .logo-text strong { font-size: 15px; font-weight: 700; color: var(--ink); }
-  .logo-text span { font-size: 11px; color: var(--ink-muted); display: block; }
-
-  .sidebar-nav { padding: 12px 10px; flex: 1; }
-
-  .nav-label {
-    font-size: 10px; font-weight: 600; color: var(--ink-muted);
-    text-transform: uppercase; letter-spacing: .08em;
-    padding: 0 10px; margin: 12px 0 6px;
-  }
-
-  .nav-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 10px; border-radius: var(--radius-sm);
-    cursor: pointer; color: var(--ink-muted);
-    font-size: 13.5px; font-weight: 500;
-    transition: all .15s;
-    text-decoration: none;
-  }
-
-  .nav-item:hover { background: var(--surface-2); color: var(--ink); }
-  .nav-item.active { background: var(--brand-light); color: var(--brand); }
-  .nav-item .nav-badge {
-    margin-left: auto; font-size: 11px; font-weight: 600;
-    background: var(--brand); color: white;
-    padding: 1px 7px; border-radius: 20px; min-width: 20px; text-align: center;
-  }
-  .nav-item.active .nav-badge { background: var(--brand); }
-
-  .sidebar-footer {
-    padding: 14px 20px;
-    border-top: 1px solid var(--border);
-    font-size: 12px; color: var(--ink-muted);
-  }
-
-  .user-chip {
-    display: flex; align-items: center; gap: 8px;
-  }
-
-  .user-avatar {
-    width: 28px; height: 28px; border-radius: 50%;
-    background: var(--brand-light); color: var(--brand);
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 700; font-size: 11px;
-  }
-
-  /* ── Main ── */
-  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-
-  .topbar {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 14px 24px;
-    display: flex; align-items: center; gap: 16px;
-  }
-
-  .topbar-title { font-size: 16px; font-weight: 700; flex: 1; }
-  .topbar-sub { font-size: 12px; color: var(--ink-muted); font-weight: 400; margin-left: 8px; }
-
-  .topbar-actions { display: flex; gap: 8px; align-items: center; }
-
-  .btn {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 7px 14px; border-radius: var(--radius-sm);
-    font-family: inherit; font-size: 13px; font-weight: 500;
-    cursor: pointer; border: none; transition: all .15s;
-  }
-  .btn-primary { background: var(--brand); color: white; }
-  .btn-primary:hover { background: var(--brand-dark); }
-  .btn-ghost { background: transparent; color: var(--ink-muted); border: 1px solid var(--border); }
-  .btn-ghost:hover { background: var(--surface-2); color: var(--ink); }
-  .btn-sm { padding: 5px 10px; font-size: 12px; }
-
-  .search-bar {
-    display: flex; align-items: center; gap: 8px;
-    background: var(--surface-2); border: 1px solid var(--border);
-    border-radius: var(--radius-sm); padding: 7px 12px;
-    font-size: 13px; color: var(--ink-muted);
-  }
-  .search-bar input {
-    border: none; background: transparent; outline: none;
-    font-family: inherit; font-size: 13px; color: var(--ink); width: 180px;
-  }
-
-  /* ── Stats row ── */
-  .stats-row {
-    display: grid; grid-template-columns: repeat(4, 1fr);
-    gap: 1px; background: var(--border);
-    border-bottom: 1px solid var(--border);
-  }
-
-  .stat-cell {
-    background: var(--surface);
-    padding: 16px 24px;
-    cursor: pointer;
-    transition: background .15s;
-  }
-  .stat-cell:hover { background: var(--surface-2); }
-  .stat-cell.active { background: var(--brand-light); }
-
-  .stat-label {
-    font-size: 11px; font-weight: 600; color: var(--ink-muted);
-    text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px;
-  }
-
-  .stat-value {
-    font-size: 26px; font-weight: 700; line-height: 1;
-    display: flex; align-items: baseline; gap: 8px;
-  }
-
-  .stat-value .stat-unit { font-size: 13px; font-weight: 500; color: var(--ink-muted); }
-
-  .stat-delta {
-    font-size: 11px; font-weight: 500; margin-top: 4px;
-    display: flex; align-items: center; gap: 3px;
-  }
-  .stat-delta.up { color: var(--success); }
-  .stat-delta.down { color: var(--danger); }
-
-  .stat-cell.active .stat-label { color: var(--brand-dark); }
-  .stat-cell.active .stat-value { color: var(--brand); }
-
-  /* ── Content ── */
-  .content { flex: 1; overflow-y: auto; padding: 20px 24px; }
-
-  .section-header {
-    display: flex; align-items: center; gap: 12px;
-    margin-bottom: 14px;
-  }
-
-  .section-title { font-size: 15px; font-weight: 700; }
-
-  .section-filters {
-    display: flex; gap: 6px; margin-left: auto;
-  }
-
-  .filter-chip {
-    padding: 4px 10px; border-radius: 20px;
-    font-size: 12px; font-weight: 500; cursor: pointer;
-    border: 1px solid var(--border); background: white;
-    color: var(--ink-muted); transition: all .15s;
-  }
-  .filter-chip:hover, .filter-chip.active {
-    background: var(--brand); color: white; border-color: var(--brand);
-  }
-
-  /* ── Table ── */
-  .data-table {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-    box-shadow: var(--shadow);
-    margin-bottom: 24px;
-  }
-
-  .table-wrap { overflow-x: auto; }
-
-  table { width: 100%; border-collapse: collapse; }
-
-  th {
-    text-align: left; padding: 10px 16px;
-    font-size: 11px; font-weight: 600; color: var(--ink-muted);
-    text-transform: uppercase; letter-spacing: .06em;
-    background: var(--surface-2);
-    border-bottom: 1px solid var(--border);
-    white-space: nowrap;
-  }
-
-  td {
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border);
-    font-size: 13px; vertical-align: middle;
-  }
-
-  tr:last-child td { border-bottom: none; }
-  tr:hover td { background: var(--surface-2); }
-
-  .client-name { font-weight: 600; color: var(--ink); }
-  .client-email { font-size: 12px; color: var(--ink-muted); }
-
-  /* Badges */
-  .badge {
-    display: inline-flex; align-items: center; gap: 4px;
-    padding: 3px 9px; border-radius: 20px;
-    font-size: 11px; font-weight: 600; white-space: nowrap;
-  }
-  .badge-success { background: var(--success-bg); color: var(--success); }
-  .badge-warning { background: var(--warning-bg); color: var(--warning); }
-  .badge-danger  { background: var(--danger-bg);  color: var(--danger);  }
-  .badge-info    { background: var(--info-bg);    color: var(--info);    }
-  .badge-neutral { background: var(--surface-2);  color: var(--ink-muted); border: 1px solid var(--border); }
-
-  .badge-dot {
-    width: 6px; height: 6px; border-radius: 50%; background: currentColor;
-  }
-
-  /* Row actions */
-  .row-actions { display: flex; gap: 6px; }
-
-  .action-btn {
-    padding: 4px 10px; border-radius: var(--radius-sm);
-    font-size: 12px; font-weight: 500; cursor: pointer;
-    border: 1px solid var(--border); background: white;
-    color: var(--ink-muted); transition: all .15s;
-    font-family: inherit;
-  }
-  .action-btn:hover { background: var(--brand); color: white; border-color: var(--brand); }
-  .action-btn.primary { background: var(--brand); color: white; border-color: var(--brand); }
-  .action-btn.primary:hover { background: var(--brand-dark); }
-
-  /* Date urgency */
-  .date-urgent { color: var(--danger); font-weight: 600; }
-  .date-soon   { color: var(--warning); font-weight: 600; }
-  .date-ok     { color: var(--success); }
-
-  /* Progress bar */
-  .progress-wrap { display: flex; align-items: center; gap: 8px; }
-  .progress-bar {
-    flex: 1; height: 5px; background: var(--border);
-    border-radius: 3px; overflow: hidden;
-  }
-  .progress-fill { height: 100%; background: var(--brand); border-radius: 3px; }
-  .progress-pct { font-size: 11px; color: var(--ink-muted); width: 28px; text-align: right; }
-
-  /* Reason tag */
-  .reason-tag {
-    display: inline-block;
-    padding: 2px 8px; border-radius: 4px;
-    font-size: 11px; font-weight: 500;
-    background: var(--surface-2); color: var(--ink-muted);
-    border: 1px solid var(--border);
-  }
-
-  /* Valor */
-  .valor { font-weight: 600; font-variant-numeric: tabular-nums; }
-
-  /* Tab sections */
-  .tab-panels { display: none; }
-  .tab-panels.active { display: block; }
-
-  /* Empty state */
-  .empty-state {
-    text-align: center; padding: 48px 24px; color: var(--ink-muted);
-  }
-  .empty-icon { font-size: 32px; margin-bottom: 10px; }
-  .empty-state p { font-size: 13px; }
-
-  /* Pagination */
-  .table-footer {
-    display: flex; align-items: center; padding: 10px 16px;
-    border-top: 1px solid var(--border);
-    font-size: 12px; color: var(--ink-muted);
-    gap: 8px;
-  }
-  .table-footer span { flex: 1; }
-
-  .pag-btn {
-    padding: 4px 10px; border: 1px solid var(--border);
-    border-radius: var(--radius-sm); background: white;
-    cursor: pointer; font-size: 12px; font-family: inherit;
-    color: var(--ink-muted);
-  }
-  .pag-btn:hover { background: var(--surface-2); }
-
-  /* Responsive */
-  @media (max-width: 900px) {
-    .sidebar { display: none; }
-    .stats-row { grid-template-columns: repeat(2, 1fr); }
-  }
+:root{--brand:#8073FF;--brand-light:#EAE8FF;--brand-dark:#5A4FCC;--ink:#111827;--muted:#6B7280;--surface:#FFFFFF;--surface-2:#F9FAFB;--border:#E5E7EB;--success:#16A34A;--success-bg:#DCFCE7;--warning:#D97706;--warning-bg:#FEF3C7;--danger:#DC2626;--danger-bg:#FEE2E2;--info:#2563EB;--info-bg:#DBEAFE;--r:12px;--r-sm:8px;--nav-h:64px;--header-h:56px}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'Alexandria',system-ui,sans-serif;background:var(--surface-2);color:var(--ink);min-height:100dvh;font-size:14px}
+#login-screen{position:fixed;inset:0;background:linear-gradient(145deg,#1a1040 0%,#2d1f7a 60%,#8073FF 100%);display:flex;align-items:center;justify-content:center;z-index:1000;padding:24px}
+.login-card{background:white;border-radius:24px;padding:36px 32px;width:100%;max-width:380px;box-shadow:0 32px 80px rgba(0,0,0,.35)}
+.login-logo{text-align:center;margin-bottom:28px}
+.login-logo-icon{width:64px;height:64px;background:var(--brand);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:20px;margin-bottom:12px}
+.login-logo h1{font-size:22px;font-weight:700}
+.login-logo p{font-size:13px;color:var(--muted);margin-top:2px}
+.login-field{margin-bottom:16px}
+.login-field label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
+.login-field input{width:100%;padding:14px 16px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:inherit;font-size:15px;color:var(--ink);outline:none;transition:border-color .15s;-webkit-appearance:none}
+.login-field input:focus{border-color:var(--brand)}
+.login-btn{width:100%;padding:15px;background:var(--brand);color:white;border:none;border-radius:var(--r-sm);font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;margin-top:8px;transition:background .15s}
+.login-btn:hover{background:var(--brand-dark)}
+.login-btn:active{transform:scale(.98)}
+.login-error{color:var(--danger);font-size:13px;text-align:center;margin-top:12px;min-height:20px}
+#app{display:none;flex-direction:column;min-height:100dvh}
+#app.visible{display:flex}
+.app-header{position:sticky;top:0;z-index:100;height:var(--header-h);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:12px}
+.header-logo{display:flex;align-items:center;gap:10px;flex:1}
+.header-logo-icon{width:32px;height:32px;background:var(--brand);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:11px;flex-shrink:0}
+.header-title{font-size:15px;font-weight:700}
+.header-sub{font-size:11px;color:var(--muted);display:none}
+.header-actions{display:flex;gap:8px;align-items:center}
+.header-user{font-size:12px;color:var(--muted);display:none}
+.icon-btn{width:36px;height:36px;border-radius:50%;border:none;background:var(--surface-2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px}
+.app-main{flex:1;overflow-y:auto;padding-bottom:calc(var(--nav-h) + 16px)}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-around;z-index:100;padding:0 8px;padding-bottom:env(safe-area-inset-bottom)}
+.nav-tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px;border-radius:var(--r-sm);cursor:pointer;color:var(--muted);border:none;background:transparent;font-family:inherit;transition:color .15s;position:relative}
+.nav-tab.active{color:var(--brand)}
+.nav-tab-icon{font-size:20px;line-height:1}
+.nav-tab-label{font-size:10px;font-weight:600}
+.nav-badge{position:absolute;top:4px;right:calc(50% - 18px);background:var(--danger);color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;min-width:16px;text-align:center}
+.page{display:none;padding:16px}
+.page.active{display:block}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.stat-card{background:var(--surface);border-radius:var(--r);padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid var(--border);cursor:pointer;transition:all .15s}
+.stat-card:active{transform:scale(.97)}
+.stat-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.stat-num{font-size:28px;font-weight:700;line-height:1}
+.stat-delta{font-size:11px;color:var(--muted);margin-top:4px}
+.stat-delta.up{color:var(--success)}
+.stat-delta.down{color:var(--danger)}
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;margin-top:4px}
+.section-head h2{font-size:15px;font-weight:700}
+.section-head a{font-size:12px;color:var(--brand);font-weight:500;text-decoration:none;cursor:pointer}
+.item-card{background:var(--surface);border-radius:var(--r);padding:16px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid var(--border)}
+.item-card-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px}
+.priority-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.priority-dot.red{background:var(--danger)}
+.priority-dot.yellow{background:var(--warning)}
+.priority-dot.green{background:var(--success)}
+.item-name{font-weight:600;font-size:14px;flex:1;line-height:1.3}
+.item-meta{font-size:12px;color:var(--muted);margin-top:2px}
+.item-card-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.item-actions{display:flex;gap:6px}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.badge-success{background:var(--success-bg);color:var(--success)}
+.badge-warning{background:var(--warning-bg);color:var(--warning)}
+.badge-danger{background:var(--danger-bg);color:var(--danger)}
+.badge-info{background:var(--info-bg);color:var(--info)}
+.badge-neutral{background:var(--surface-2);color:var(--muted);border:1px solid var(--border)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:var(--r-sm);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s}
+.btn-sm{padding:6px 12px;font-size:12px}
+.btn-primary{background:var(--brand);color:white}
+.btn-primary:hover{background:var(--brand-dark)}
+.btn-primary:active{transform:scale(.96)}
+.btn-ghost{background:var(--surface-2);color:var(--muted);border:1px solid var(--border)}
+.search-bar{display:flex;align-items:center;gap:10px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:16px}
+.search-bar input{border:none;outline:none;font-family:inherit;font-size:14px;flex:1;background:transparent}
+.search-bar span{color:var(--muted);font-size:16px}
+.filter-row{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px;scrollbar-width:none}
+.filter-row::-webkit-scrollbar{display:none}
+.filter-chip{flex-shrink:0;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1.5px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;white-space:nowrap}
+.filter-chip.active{background:var(--brand);color:white;border-color:var(--brand)}
+.empty{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty-icon{font-size:36px;margin-bottom:10px}
+.progress{height:5px;background:var(--border);border-radius:3px;overflow:hidden;flex:1}
+.progress-fill{height:100%;background:var(--brand);border-radius:3px}
+@media(min-width:768px){
+  #app{flex-direction:row}
+  .bottom-nav{display:none}
+  .sidebar{width:220px;min-width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100dvh;position:sticky;top:0}
+  .sidebar-logo{padding:20px;border-bottom:1px solid var(--border)}
+  .sidebar-logo-icon{width:40px;height:40px;background:var(--brand);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:14px}
+  .sidebar-logo h2{font-size:15px;font-weight:700;margin-top:8px}
+  .sidebar-logo p{font-size:11px;color:var(--muted)}
+  .sidebar-nav{padding:12px 10px;flex:1}
+  .snav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r-sm);cursor:pointer;color:var(--muted);font-size:13px;font-weight:500;border:none;background:transparent;width:100%;font-family:inherit;transition:all .15s;text-align:left}
+  .snav-item:hover{background:var(--surface-2);color:var(--ink)}
+  .snav-item.active{background:var(--brand-light);color:var(--brand)}
+  .snav-badge{margin-left:auto;background:var(--brand);color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px}
+  .sidebar-footer{padding:14px 16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+  .app-main{flex:1;overflow-y:auto;padding-bottom:16px}
+  .app-header .header-sub,.app-header .header-user{display:block}
+  .stats-grid{grid-template-columns:repeat(4,1fr)}
+}
 </style>
 </head>
 <body>
-
-<!-- Sidebar -->
-<aside class="sidebar">
-  <div class="sidebar-logo">
-    <div class="logo-mark">
-      <div class="logo-icon">nB</div>
-      <div class="logo-text">
-        <strong>newB</strong>
-        <span>seguros</span>
-      </div>
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon">nB</div>
+      <h1>NewB Seguros</h1>
+      <p>Central de Acompanhamento</p>
     </div>
+    <div class="login-field"><label>Usuário</label><input id="lu" type="text" placeholder="seu usuário" autocomplete="username" autocapitalize="none"></div>
+    <div class="login-field"><label>Senha</label><input id="lp" type="password" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="login-btn" onclick="doLogin()">Entrar</button>
+    <div class="login-error" id="lerr"></div>
+  </div>
+</div>
+
+<div id="app">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">nB</div>
+      <h2>NewB Seguros</h2><p>Central</p>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="snav-item active" onclick="go('home',this)">🏠 Dashboard</button>
+      <button class="snav-item" onclick="go('renovacoes',this)">↻ Renovações <span class="snav-badge" id="sb-ren">—</span></button>
+      <button class="snav-item" onclick="go('retomadas',this)">◎ Retomadas</button>
+      <button class="snav-item" onclick="go('cotacoes',this)">✦ Cotações <span class="snav-badge" id="sb-cot">—</span></button>
+      <button class="snav-item" onclick="go('emails',this)">📧 Emails</button>
+      <button class="snav-item" onclick="go('whatsapp',this)">📱 WhatsApp</button>
+    </nav>
+    <div class="sidebar-footer"><span id="su">—</span><br><button onclick="doLogout()" style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;font-family:inherit;padding:4px 0">Sair →</button></div>
+  </aside>
+
+  <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+    <header class="app-header">
+      <div class="header-logo">
+        <div class="header-logo-icon">nB</div>
+        <div><div class="header-title" id="pt">Dashboard</div><div class="header-sub">NewB Seguros</div></div>
+      </div>
+      <div class="header-actions">
+        <span class="header-user" id="hu"></span>
+        <button class="icon-btn" onclick="loadAll()">🔄</button>
+        <button class="icon-btn" onclick="doLogout()">🚪</button>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <div class="page active" id="page-home">
+        <div class="stats-grid">
+          <div class="stat-card" onclick="go('cotacoes')"><div class="stat-label">Cotações</div><div class="stat-num" id="sc">—</div><div class="stat-delta" id="scd">—</div></div>
+          <div class="stat-card" onclick="go('renovacoes')"><div class="stat-label">Renovações</div><div class="stat-num" id="sr" style="color:var(--warning)">—</div><div class="stat-delta down" id="srd">—</div></div>
+          <div class="stat-card" onclick="go('retomadas')"><div class="stat-label">Retomadas</div><div class="stat-num" id="srt" style="color:var(--danger)">—</div><div class="stat-delta" id="srtd">—</div></div>
+          <div class="stat-card"><div class="stat-label">Emails hoje</div><div class="stat-num" id="se" style="color:var(--brand)">—</div><div class="stat-delta up">registrados</div></div>
+        </div>
+        <div class="section-head"><h2>🔴 Urgentes</h2><a onclick="go('renovacoes')">Ver todas →</a></div>
+        <div id="hu-list"></div>
+        <div class="section-head" style="margin-top:16px"><h2>✦ Novas Cotações</h2><a onclick="go('cotacoes')">Ver todas →</a></div>
+        <div id="hc-list"></div>
+      </div>
+
+      <div class="page" id="page-renovacoes">
+        <div class="filter-row">
+          <span class="filter-chip active" onclick="fRen('all',this)">Todas</span>
+          <span class="filter-chip" onclick="fRen('urgente',this)">🔴 Urgente</span>
+          <span class="filter-chip" onclick="fRen('breve',this)">🟡 Em breve</span>
+          <span class="filter-chip" onclick="fRen('ok',this)">🟢 Em dia</span>
+        </div>
+        <div id="lr"></div>
+      </div>
+
+      <div class="page" id="page-retomadas">
+        <div class="filter-row">
+          <span class="filter-chip active" onclick="fRet('all',this)">Todas</span>
+          <span class="filter-chip" onclick="fRet('em_contato',this)">Em contato</span>
+          <span class="filter-chip" onclick="fRet('sem_contato',this)">Sem resposta</span>
+          <span class="filter-chip" onclick="fRet('perdido',this)">Perdido</span>
+        </div>
+        <div id="lret"></div>
+      </div>
+
+      <div class="page" id="page-cotacoes">
+        <div class="filter-row">
+          <span class="filter-chip active" onclick="fCot('all',this)">Todas</span>
+          <span class="filter-chip" onclick="fCot('aguardando',this)">🟡 Aguardando</span>
+          <span class="filter-chip" onclick="fCot('em_cotacao',this)">🔵 Em cotação</span>
+          <span class="filter-chip" onclick="fCot('fechado',this)">✅ Fechado</span>
+        </div>
+        <div id="lc"></div>
+      </div>
+
+      <div class="page" id="page-emails">
+        <div class="search-bar"><span>🔍</span><input type="search" placeholder="Buscar assunto, remetente..." oninput="sEmail(this.value)"></div>
+        <div id="le"></div>
+      </div>
+
+      <div class="page" id="page-whatsapp">
+        <div class="filter-row">
+          <span class="filter-chip active" onclick="fWA('all',this)">Todos</span>
+          <span class="filter-chip" onclick="fWA('Anne',this)">Anne</span>
+          <span class="filter-chip" onclick="fWA('Ana',this)">Ana</span>
+          <span class="filter-chip" onclick="fWA('Gustavo',this)">Gustavo</span>
+        </div>
+        <div id="lw"></div>
+      </div>
+    </main>
   </div>
 
-  <nav class="sidebar-nav">
-    <div class="nav-label">Central</div>
-    <a class="nav-item active" onclick="showTab('all')">
-      <span>◉</span> Dashboard
-      <span class="nav-badge">47</span>
-    </a>
-
-    <div class="nav-label">Carteira</div>
-    <a class="nav-item" onclick="showTab('renovacoes')">
-      <span>↻</span> Renovações
-      <span class="nav-badge" style="background:#D97706">18</span>
-    </a>
-    <a class="nav-item" onclick="showTab('retomadas')">
-      <span>◎</span> Retomadas
-      <span class="nav-badge" style="background:#DC2626">12</span>
-    </a>
-    <a class="nav-item" onclick="showTab('novos')">
-      <span>✦</span> Novos Clientes
-      <span class="nav-badge" style="background:#16A34A">17</span>
-    </a>
-
-    <div class="nav-label">Gestão</div>
-    <a class="nav-item"><span>📋</span> Apólices</a>
-    <a class="nav-item"><span>📊</span> Relatórios</a>
-    <a class="nav-item"><span>⚙</span> Configurações</a>
+  <nav class="bottom-nav">
+    <button class="nav-tab active" onclick="go('home',this)" id="tab-home"><span class="nav-tab-icon">🏠</span><span class="nav-tab-label">Início</span></button>
+    <button class="nav-tab" onclick="go('renovacoes',this)" id="tab-renovacoes"><span class="nav-tab-icon">↻</span><span class="nav-badge" id="nb-ren" style="display:none"></span><span class="nav-tab-label">Renovações</span></button>
+    <button class="nav-tab" onclick="go('retomadas',this)" id="tab-retomadas"><span class="nav-tab-icon">◎</span><span class="nav-tab-label">Retomadas</span></button>
+    <button class="nav-tab" onclick="go('cotacoes',this)" id="tab-cotacoes"><span class="nav-tab-icon">✦</span><span class="nav-badge" id="nb-cot" style="display:none"></span><span class="nav-tab-label">Cotações</span></button>
+    <button class="nav-tab" onclick="go('emails',this)" id="tab-emails"><span class="nav-tab-icon">📧</span><span class="nav-tab-label">Emails</span></button>
   </nav>
-
-  <div class="sidebar-footer">
-    <div class="user-chip">
-      <div class="user-avatar">MD</div>
-      <div>
-        <div style="font-weight:600;color:var(--ink);font-size:13px">Marcelo Didier</div>
-        <div>Administrador</div>
-      </div>
-    </div>
-  </div>
-</aside>
-
-<!-- Main -->
-<div class="main">
-
-  <!-- Topbar -->
-  <div class="topbar">
-    <div class="topbar-title">
-      Central de Acompanhamento
-      <span class="topbar-sub">Atualizado hoje às 09/11/2026</span>
-    </div>
-    <div class="topbar-actions">
-      <div class="search-bar">
-        <span>🔍</span>
-        <input type="text" placeholder="Buscar cliente, apólice..." oninput="filterTable(this.value)">
-      </div>
-      <button class="btn btn-ghost">↓ Exportar</button>
-      <button class="btn btn-primary">+ Nova Solicitação</button>
-    </div>
-  </div>
-
-  <!-- Stats -->
-  <div class="stats-row">
-    <div class="stat-cell active" onclick="showTab('all');setStatActive(this)">
-      <div class="stat-label">Total Ativo</div>
-      <div class="stat-value">47 <span class="stat-unit">pendências</span></div>
-      <div class="stat-delta up">↑ 8 esta semana</div>
-    </div>
-    <div class="stat-cell" onclick="showTab('renovacoes');setStatActive(this)">
-      <div class="stat-label">Renovações</div>
-      <div class="stat-value" style="color:var(--warning)">18 <span class="stat-unit">clientes</span></div>
-      <div class="stat-delta down">↓ 5 vencem em 30 dias</div>
-    </div>
-    <div class="stat-cell" onclick="showTab('retomadas');setStatActive(this)">
-      <div class="stat-label">Retomadas</div>
-      <div class="stat-value" style="color:var(--danger)">12 <span class="stat-unit">inativos</span></div>
-      <div class="stat-delta">◉ 4 em contato</div>
-    </div>
-    <div class="stat-cell" onclick="showTab('novos');setStatActive(this)">
-      <div class="stat-label">Novos Clientes</div>
-      <div class="stat-value" style="color:var(--success)">17 <span class="stat-unit">solicitações</span></div>
-      <div class="stat-delta up">↑ 3 hoje</div>
-    </div>
-  </div>
-
-  <!-- Content -->
-  <div class="content">
-
-    <!-- RENOVAÇÕES -->
-    <div id="tab-renovacoes" class="tab-panels active">
-      <div class="section-header">
-        <div class="section-title">↻ Renovações de Carteira</div>
-        <div class="section-filters">
-          <span class="filter-chip active" onclick="filterStatus('renovacoes','all',this)">Todos (18)</span>
-          <span class="filter-chip" onclick="filterStatus('renovacoes','urgente',this)">🔴 Urgente (5)</span>
-          <span class="filter-chip" onclick="filterStatus('renovacoes','breve',this)">🟡 Em breve (8)</span>
-          <span class="filter-chip" onclick="filterStatus('renovacoes','ok',this)">🟢 OK (5)</span>
-        </div>
-      </div>
-
-      <div class="data-table">
-        <div class="table-wrap">
-          <table id="tbl-renovacoes">
-            <thead>
-              <tr>
-                <th>Cliente</th>
-                <th>Seguro</th>
-                <th>Seguradora</th>
-                <th>Vencimento</th>
-                <th>Prêmio / ano</th>
-                <th>Status</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr data-status="urgente">
-                <td><div class="client-name">Carlos Ferreira</div><div class="client-email">carlos@empresa.com.br</div></td>
-                <td><span class="badge badge-info">Auto</span></td>
-                <td>Porto Seguro</td>
-                <td class="date-urgent">12/11/2026 — 3 dias</td>
-                <td class="valor">R$ 4.200</td>
-                <td><span class="badge badge-danger"><span class="badge-dot"></span>Urgente</span></td>
-                <td><div class="row-actions"><button class="action-btn primary">Contatar</button><button class="action-btn">Ver</button></div></td>
-              </tr>
-              <tr data-status="urgente">
-                <td><div class="client-name">Mariana Souza</div><div class="client-email">mari@gmail.com</div></td>
-                <td><span class="badge badge-info">Vida</span></td>
-                <td>SulAmérica</td>
-                <td class="date-urgent">14/11/2026 — 5 dias</td>
-                <td class="valor">R$ 2.800</td>
-                <td><span class="badge badge-danger"><span class="badge-dot"></span>Urgente</span></td>
-                <td><div class="row-actions"><button class="action-btn primary">Contatar</button><button class="action-btn">Ver</button></div></td>
-              </tr>
-              <tr data-status="urgente">
-                <td><div class="client-name">Construtora RB Ltda</div><div class="client-email">adm@construtorb.com.br</div></td>
-                <td><span class="badge badge-info">Empresarial</span></td>
-                <td>Zurich</td>
-                <td class="date-urgent">15/11/2026 — 6 dias</td>
-                <td class="valor">R$ 18.500</td>
-                <td><span class="badge badge-danger"><span class="badge-dot"></span>Urgente</span></td>
-                <td><div class="row-actions"><button class="action-btn primary">Contatar</button><button class="action-btn">Ver</button></div></td>
-              </tr>
-              <tr data-status="breve">
-                <td><div class="client-name">Fernanda Lima</div><div class="client-email">fe.lima@hotmail.com</div></td>
-                <td><span class="badge badge-info">Residência</span></td>
-                <td>Bradesco Seguros</td>
-                <td class="date-soon">28/11/2026 — 19 dias</td>
-                <td class="valor">R$ 1.200</td>
-                <td><span class="badge badge-warning"><span class="badge-dot"></span>Em breve</span></td>
-                <td><div class="row-actions"><button class="action-btn">Enviar proposta</button><button class="action-btn">Ver</button></div></td>
-              </tr>
-              <tr data-status="breve">
-                <td><div class="client-name">Ricardo Alves</div><div class="client-email">ricardoa@empresa.com</div></td>
-                <td><span class="badge badge-info">Saúde</span></td>
-                <td>Amil</td>
-                <td class="date-soon">02/12/2026 — 23 dias</td>
-                <td class="valor">R$ 36.000</td>
-                <td><span class="badge badge-warning"><span class="badge-dot"></span>Em breve</span></td>
-                <td><div class="row-actions"><button class="action-btn">Enviar proposta</button><button class="action-btn">Ver</button></div></td>
-              </tr>
-              <tr data-status="breve">
-                <td><div class="client-name">Ana Paula Ramos</div><div class="client-email">anapaula@gmail.com</div></td>
-                <td><span class="badge badge-info">Auto</span></td>
-                <td>Allianz</td>
-                <td class="date-soon">05/12/2026 — 26 dias</td>
-                <td class="valor">R$ 3.600</td>
-                <td><span class="badge badge-warning"><span class="badge-dot"></span>Em breve</span></td>
-                <td><div class="row-actions"><button class="action-btn">Enviar proposta</button><button class="action-btn">Ver</button></div></td>
-              </tr>
-              <tr data-status="ok">
-                <td><div class="client-name">Tech Soluções S.A.</div><div class="client-email">rh@techsolucoes.com</div></td>
-                <td><span class="badge badge-info">D&O</span></td>
-                <td>Chubb</td>
-                <td class="date-ok">15/01/2027 — 67 dias</td>
-                <td class="valor">R$ 52.000</td>
-                <td><span class="badge badge-success"><span class="badge-dot"></span>Em dia</span></td>
-                <td><div class="row-actions"><button class="action-btn">Agendar</button><button class="action-btn">Ver</button></div></td>
-              </tr>
-              <tr data-status="ok">
-                <td><div class="client-name">Gustavo Mendes</div><div class="client-email">gustavom@outlook.com</div></td>
-                <td><span class="badge badge-info">Moto</span></td>
-                <td>Tokio Marine</td>
-                <td class="date-ok">22/01/2027 — 74 dias</td>
-                <td class="valor">R$ 980</td>
-                <td><span class="badge badge-success"><span class="badge-dot"></span>Em dia</span></td>
-                <td><div class="row-actions"><button class="action-btn">Agendar</button><button class="action-btn">Ver</button></div></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="table-footer">
-          <span>Exibindo 8 de 18 renovações</span>
-          <button class="pag-btn">← Anterior</button>
-          <button class="pag-btn">Próximo →</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- RETOMADAS -->
-    <div id="tab-retomadas" class="tab-panels">
-      <div class="section-header">
-        <div class="section-title">◎ Retomadas — Clientes Inativos</div>
-        <div class="section-filters">
-          <span class="filter-chip active">Todos (12)</span>
-          <span class="filter-chip">Em contato (4)</span>
-          <span class="filter-chip">Sem resposta (5)</span>
-          <span class="filter-chip">Perdido (3)</span>
-        </div>
-      </div>
-
-      <div class="data-table">
-        <div class="table-wrap">
-          <table id="tbl-retomadas">
-            <thead>
-              <tr>
-                <th>Cliente</th>
-                <th>Último Seguro</th>
-                <th>Venceu em</th>
-                <th>Motivo saída</th>
-                <th>Último contato</th>
-                <th>Probabilidade</th>
-                <th>Status</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><div class="client-name">Paulo Rodrigues</div><div class="client-email">paulo.r@empresa.com.br</div></td>
-                <td><span class="badge badge-neutral">Auto</span></td>
-                <td>Fev/2026</td>
-                <td><span class="reason-tag">Preço alto</span></td>
-                <td>03/11/2026</td>
-                <td>
-                  <div class="progress-wrap">
-                    <div class="progress-bar"><div class="progress-fill" style="width:72%"></div></div>
-                    <span class="progress-pct">72%</span>
-                  </div>
-                </td>
-                <td><span class="badge badge-info"><span class="badge-dot"></span>Em contato</span></td>
-                <td><div class="row-actions"><button class="action-btn primary">Retomar</button><button class="action-btn">Histórico</button></div></td>
-              </tr>
-              <tr>
-                <td><div class="client-name">Beatriz Costa</div><div class="client-email">beatrizcosta@gmail.com</div></td>
-                <td><span class="badge badge-neutral">Residência</span></td>
-                <td>Jan/2026</td>
-                <td><span class="reason-tag">Mudança</span></td>
-                <td>28/10/2026</td>
-                <td>
-                  <div class="progress-wrap">
-                    <div class="progress-bar"><div class="progress-fill" style="width:58%"></div></div>
-                    <span class="progress-pct">58%</span>
-                  </div>
-                </td>
-                <td><span class="badge badge-info"><span class="badge-dot"></span>Em contato</span></td>
-                <td><div class="row-actions"><button class="action-btn primary">Retomar</button><button class="action-btn">Histórico</button></div></td>
-              </tr>
-              <tr>
-                <td><div class="client-name">Importadora XM Ltda</div><div class="client-email">financeiro@xm.com.br</div></td>
-                <td><span class="badge badge-neutral">Transporte</span></td>
-                <td>Mar/2026</td>
-                <td><span class="reason-tag">Concorrente</span></td>
-                <td>15/10/2026</td>
-                <td>
-                  <div class="progress-wrap">
-                    <div class="progress-bar"><div class="progress-fill" style="width:40%"></div></div>
-                    <span class="progress-pct">40%</span>
-                  </div>
-                </td>
-                <td><span class="badge badge-warning"><span class="badge-dot"></span>Sem resposta</span></td>
-                <td><div class="row-actions"><button class="action-btn">Follow-up</button><button class="action-btn">Histórico</button></div></td>
-              </tr>
-              <tr>
-                <td><div class="client-name">Diego Martins</div><div class="client-email">diegomartins@outlook.com</div></td>
-                <td><span class="badge badge-neutral">Vida</span></td>
-                <td>Abr/2026</td>
-                <td><span class="reason-tag">Preço alto</span></td>
-                <td>—</td>
-                <td>
-                  <div class="progress-wrap">
-                    <div class="progress-bar"><div class="progress-fill" style="width:25%"></div></div>
-                    <span class="progress-pct">25%</span>
-                  </div>
-                </td>
-                <td><span class="badge badge-warning"><span class="badge-dot"></span>Sem resposta</span></td>
-                <td><div class="row-actions"><button class="action-btn">Contatar</button><button class="action-btn">Histórico</button></div></td>
-              </tr>
-              <tr>
-                <td><div class="client-name">Clínica São Lucas</div><div class="client-email">adm@sãolucas.med.br</div></td>
-                <td><span class="badge badge-neutral">RC Profissional</span></td>
-                <td>Dez/2025</td>
-                <td><span class="reason-tag">Encerrou atividade</span></td>
-                <td>—</td>
-                <td>
-                  <div class="progress-wrap">
-                    <div class="progress-bar"><div class="progress-fill" style="width:8%; background:#DC2626"></div></div>
-                    <span class="progress-pct">8%</span>
-                  </div>
-                </td>
-                <td><span class="badge badge-danger"><span class="badge-dot"></span>Perdido</span></td>
-                <td><div class="row-actions"><button class="action-btn">Arquivar</button><button class="action-btn">Ver</button></div></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="table-footer">
-          <span>Exibindo 5 de 12 inativos</span>
-          <button class="pag-btn">← Anterior</button>
-          <button class="pag-btn">Próximo →</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- NOVOS -->
-    <div id="tab-novos" class="tab-panels">
-      <div class="section-header">
-        <div class="section-title">✦ Novos Clientes — Solicitações</div>
-        <div class="section-filters">
-          <span class="filter-chip active">Todos (17)</span>
-          <span class="filter-chip">🟡 Aguardando (9)</span>
-          <span class="filter-chip">🟢 Em cotação (5)</span>
-          <span class="filter-chip">✓ Fechados (3)</span>
-        </div>
-      </div>
-
-      <div class="data-table">
-        <div class="table-wrap">
-          <table id="tbl-novos">
-            <thead>
-              <tr>
-                <th>Solicitante</th>
-                <th>Tipo de Seguro</th>
-                <th>Canal</th>
-                <th>Data Entrada</th>
-                <th>Valor estimado</th>
-                <th>Responsável</th>
-                <th>Status</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><div class="client-name">Juliana Pereira</div><div class="client-email">ju.pereira@gmail.com</div></td>
-                <td><span class="badge badge-info">Auto</span></td>
-                <td>Site</td>
-                <td>09/11/2026 🆕</td>
-                <td class="valor">~R$ 3.800</td>
-                <td>Barbara</td>
-                <td><span class="badge badge-warning"><span class="badge-dot"></span>Aguardando</span></td>
-                <td><div class="row-actions"><button class="action-btn primary">Iniciar cotação</button><button class="action-btn">Ver</button></div></td>
-              </tr>
-              <tr>
-                <td><div class="client-name">Marcos Vinicius</div><div class="client-email">marcosv@empresa.com</div></td>
-                <td><span class="badge badge-info">Saúde Empresarial</span></td>
-                <td>WhatsApp</td>
-                <td>09/11/2026 🆕</td>
-                <td class="valor">~R$ 48.000</td>
-                <td>Newton</td>
-                <td><span class="badge badge-warning"><span class="badge-dot"></span>Aguardando</span></td>
-                <td><div class="row-actions"><button class="action-btn primary">Iniciar cotação</button><button class="action-btn">Ver</button></div></td>
-              </tr>
-              <tr>
-                <td><div class="client-name">Loja Moda Fácil</div><div class="client-email">gerencia@modafacil.com.br</div></td>
-                <td><span class="badge badge-info">Empresarial</span></td>
-                <td>Indicação</td>
-                <td>08/11/2026</td>
-                <td class="valor">~R$ 12.000</td>
-                <td>Comercial</td>
-                <td><span class="badge badge-info"><span class="badge-dot"></span>Em cotação</span></td>
-                <td><div class="row-actions"><button class="action-btn">Enviar proposta</button><button class="action-btn">Ver</button></div></td>
-              </tr>
-              <tr>
-                <td><div class="client-name">Renata Oliveira</div><div class="client-email">renata.oli@hotmail.com</div></td>
-                <td><span class="badge badge-info">Vida</span></td>
-                <td>Email</td>
-                <td>07/11/2026</td>
-                <td class="valor">~R$ 1.800</td>
-                <td>Barbara</td>
-                <td><span class="badge badge-info"><span class="badge-dot"></span>Em cotação</span></td>
-                <td><div class="row-actions"><button class="action-btn">Enviar proposta</button><button class="action-btn">Ver</button></div></td>
-              </tr>
-              <tr>
-                <td><div class="client-name">Construtora Braga</div><div class="client-email">obras@braga.eng.br</div></td>
-                <td><span class="badge badge-info">Riscos Engenharia</span></td>
-                <td>Site</td>
-                <td>05/11/2026</td>
-                <td class="valor">~R$ 85.000</td>
-                <td>Newton</td>
-                <td><span class="badge badge-success"><span class="badge-dot"></span>Fechado ✓</span></td>
-                <td><div class="row-actions"><button class="action-btn">Apólice</button><button class="action-btn">Ver</button></div></td>
-              </tr>
-              <tr>
-                <td><div class="client-name">Felipe Cardoso</div><div class="client-email">felipe.c@gmail.com</div></td>
-                <td><span class="badge badge-info">Bike</span></td>
-                <td>Instagram</td>
-                <td>04/11/2026</td>
-                <td class="valor">~R$ 650</td>
-                <td>Suporte</td>
-                <td><span class="badge badge-success"><span class="badge-dot"></span>Fechado ✓</span></td>
-                <td><div class="row-actions"><button class="action-btn">Apólice</button><button class="action-btn">Ver</button></div></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="table-footer">
-          <span>Exibindo 6 de 17 solicitações</span>
-          <button class="pag-btn">← Anterior</button>
-          <button class="pag-btn">Próximo →</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ALL (padrão) — mostra os três -->
-    <div id="tab-all" class="tab-panels" style="display:none"></div>
-
-  </div><!-- /content -->
-</div><!-- /main -->
+</div>
 
 <script>
-  // Nav ativo
-  document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', function() {
-      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-      this.classList.add('active');
-    });
-  });
+const API='http://localhost:8000/api';
+let TK=localStorage.getItem('newb_token')||'';
+let _r=[],_ret=[],_c=[],_e=[],_w=[];
+const PT={home:'Dashboard',renovacoes:'Renovações',retomadas:'Retomadas',cotacoes:'Cotações',emails:'Emails',whatsapp:'WhatsApp'};
 
-  function showTab(tab) {
-    // Esconde todos
-    document.querySelectorAll('.tab-panels').forEach(p => p.style.display = 'none');
-    if (tab === 'all') {
-      // Mostra os três
-      document.getElementById('tab-renovacoes').style.display = 'block';
-      document.getElementById('tab-retomadas').style.display = 'block';
-      document.getElementById('tab-novos').style.display = 'block';
-    } else {
-      const el = document.getElementById('tab-' + tab);
-      if (el) el.style.display = 'block';
-    }
-  }
+async function doLogin(){
+  const u=document.getElementById('lu').value.trim(),p=document.getElementById('lp').value,er=document.getElementById('lerr');
+  if(!u||!p){er.textContent='Preencha usuário e senha';return;}
+  er.textContent='';
+  try{
+    const r=await fetch(`${API}/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    const d=await r.json();
+    if(!r.ok){er.textContent=d.detail||'Usuário ou senha inválidos';return;}
+    TK=d.token;localStorage.setItem('newb_token',TK);
+    setUser(d.user);showApp();loadAll();
+  }catch{er.textContent='Erro de conexão';}
+}
+function doLogout(){localStorage.removeItem('newb_token');TK='';document.getElementById('login-screen').style.display='flex';document.getElementById('app').classList.remove('visible');}
+function setUser(u){document.getElementById('hu').textContent=u;document.getElementById('su').textContent=u;}
+function showApp(){document.getElementById('login-screen').style.display='none';document.getElementById('app').classList.add('visible');}
 
-  function setStatActive(el) {
-    document.querySelectorAll('.stat-cell').forEach(c => c.classList.remove('active'));
-    el.classList.add('active');
-  }
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('login-screen').style.display!=='none')doLogin();});
 
-  function filterStatus(tab, status, chip) {
-    document.querySelectorAll(`#tab-${tab} .filter-chip`).forEach(c => c.classList.remove('active'));
-    chip.classList.add('active');
-    const rows = document.querySelectorAll(`#tbl-${tab} tbody tr`);
-    rows.forEach(row => {
-      if (status === 'all') {
-        row.style.display = '';
-      } else {
-        row.style.display = row.dataset.status === status ? '' : 'none';
-      }
-    });
-  }
+function go(name,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+name)?.classList.add('active');
+  document.getElementById('pt').textContent=PT[name]||name;
+  document.querySelectorAll('.snav-item').forEach(i=>i.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+name)?.classList.add('active');
+  if(btn?.classList.contains('snav-item'))btn.classList.add('active');
+}
 
-  function filterTable(query) {
-    const q = query.toLowerCase();
-    document.querySelectorAll('tbody tr').forEach(row => {
-      row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
-    });
-  }
+async function ap(path){try{const r=await fetch(API+path,{headers:{authorization:'Bearer '+TK}});return r.ok?r.json():null;}catch{return null;}}
 
-  // Init: mostra todos
-  showTab('all');
+async function loadAll(){
+  const[st,r,ret,c,e,w]=await Promise.all([ap('/stats'),ap('/renovacoes?limit=50'),ap('/retomadas?limit=50'),ap('/cotacoes?limit=50'),ap('/emails/log?limit=100&today_only=true'),ap('/whatsapp/log?limit=100')]);
+  if(st)rStats(st);
+  if(r){_r=r.items;rRen(_r);rHU(_r);}
+  if(ret){_ret=ret.items;rRet(_ret);}
+  if(c){_c=c.items;rCot(_c);rHC(_c);}
+  if(e){_e=e.items;rEmail(_e);}
+  if(w){_w=w.items;rWA(_w);}
+}
+
+function rStats(s){
+  set('sc',s.cotacoes.total);set('scd',`${s.cotacoes.aguardando} aguardando`);
+  set('sr',s.renovacoes.total);set('srd',`${s.renovacoes.urgente} urgentes`);
+  set('srt',s.retomadas.total);set('srtd',`${s.retomadas.em_contato} em contato`);
+  set('se',s.emails?.hoje||0);
+  bdg('sb-ren','nb-ren',s.renovacoes.urgente);
+  bdg('sb-cot','nb-cot',s.cotacoes.aguardando);
+}
+function set(id,v){const e=document.getElementById(id);if(e)e.textContent=v;}
+function bdg(si,mi,v){const s=document.getElementById(si),m=document.getElementById(mi);if(s)s.textContent=v||'—';if(m){m.textContent=v;m.style.display=v>0?'block':'none';}}
+
+function renCard(r){
+  const dot=r.urgencia==='urgente'?'red':r.urgencia==='breve'?'yellow':'green';
+  const bg=r.urgencia==='urgente'?'<span class="badge badge-danger">Urgente</span>':r.urgencia==='breve'?'<span class="badge badge-warning">Em breve</span>':'<span class="badge badge-success">Em dia</span>';
+  const v=r.premio_anual?`R$ ${r.premio_anual.toLocaleString('pt-BR')}`:'—';
+  return`<div class="item-card"><div class="item-card-top"><div class="priority-dot ${dot}"></div><div style="flex:1"><div class="item-name">${r.cliente_nome}</div><div class="item-meta">${r.tipo_seguro} · ${r.seguradora||'—'}</div><div class="item-meta" style="margin-top:4px">📅 ${r.vencimento} · ${v}</div></div>${bg}</div><div class="item-card-bottom"><span class="badge badge-neutral">${r.responsavel||'—'}</span><div class="item-actions"><button class="btn btn-sm btn-ghost">Ver</button><button class="btn btn-sm btn-primary">Contatar</button></div></div></div>`;
+}
+function rRen(d){document.getElementById('lr').innerHTML=d.length?d.map(renCard).join(''):emp('Nenhuma renovação');}
+function rHU(d){document.getElementById('hu-list').innerHTML=d.filter(r=>r.urgencia==='urgente').slice(0,3).map(renCard).join('')||emp('Nenhuma urgência');}
+function fRen(v,c){chip(c);rRen(v==='all'?_r:_r.filter(r=>r.urgencia===v));}
+
+function retCard(r){
+  const bg={em_contato:'<span class="badge badge-info">Em contato</span>',sem_contato:'<span class="badge badge-warning">Sem resposta</span>',perdido:'<span class="badge badge-danger">Perdido</span>',recuperado:'<span class="badge badge-success">Recuperado</span>'}[r.status]||r.status;
+  return`<div class="item-card"><div class="item-card-top"><div style="flex:1"><div class="item-name">${r.cliente_nome}</div><div class="item-meta">${r.ultimo_seguro||'—'} · ${(r.motivo_saida||'—').replace(/_/g,' ')}</div><div style="display:flex;align-items:center;gap:8px;margin-top:8px"><div class="progress"><div class="progress-fill" style="width:${r.probabilidade||0}%"></div></div><span style="font-size:12px;font-weight:600;color:var(--brand)">${r.probabilidade||0}%</span></div></div>${bg}</div><div class="item-card-bottom"><span class="badge badge-neutral">${r.responsavel||'—'}</span><div class="item-actions"><button class="btn btn-sm btn-ghost">Histórico</button><button class="btn btn-sm btn-primary">Retomar</button></div></div></div>`;
+}
+function rRet(d){document.getElementById('lret').innerHTML=d.length?d.map(retCard).join(''):emp('Nenhuma retomada');}
+function fRet(v,c){chip(c);rRet(v==='all'?_ret:_ret.filter(r=>r.status===v));}
+
+function cotCard(c){
+  const bg={aguardando:'<span class="badge badge-warning">Aguardando</span>',em_cotacao:'<span class="badge badge-info">Em cotação</span>',proposta_enviada:'<span class="badge badge-info">Proposta enviada</span>',fechado:'<span class="badge badge-success">Fechado ✓</span>',perdido:'<span class="badge badge-danger">Perdido</span>'}[c.status]||c.status;
+  const v=c.valor_estimado?`~R$ ${c.valor_estimado.toLocaleString('pt-BR')}`:'—';
+  return`<div class="item-card"><div class="item-card-top"><div style="flex:1"><div class="item-name">${c.cliente_nome}</div><div class="item-meta">${c.tipo_seguro} · ${c.canal||'—'} · ${v}</div><div class="item-meta" style="margin-top:2px">📅 ${(c.criado_em||'').split(' ')[0]||'—'}</div></div>${bg}</div><div class="item-card-bottom"><span class="badge badge-neutral">${c.responsavel||'—'}</span><div class="item-actions"><button class="btn btn-sm btn-ghost">Ver</button><button class="btn btn-sm btn-primary" onclick="startC(${c.id})">Iniciar</button></div></div></div>`;
+}
+function rCot(d){document.getElementById('lc').innerHTML=d.length?d.map(cotCard).join(''):emp('Nenhuma cotação');}
+function rHC(d){document.getElementById('hc-list').innerHTML=d.filter(c=>c.status==='aguardando').slice(0,3).map(cotCard).join('')||emp('Sem cotações aguardando');}
+function fCot(v,c){chip(c);rCot(v==='all'?_c:_c.filter(c=>c.status===v));}
+async function startC(id){await fetch(`${API}/cotacoes/${id}?status=em_cotacao`,{method:'PATCH',headers:{authorization:'Bearer '+TK}});loadAll();}
+
+function emailCard(e){
+  const tags=JSON.parse(e.tags||'[]');
+  const tg=tags.slice(0,2).map(t=>`<span class="badge badge-neutral">${t}</span>`).join(' ');
+  const dot=e.priority==='🔴'?'red':e.priority==='🟡'?'yellow':'green';
+  return`<div class="item-card"><div class="item-card-top"><div class="priority-dot ${dot}"></div><div style="flex:1"><div class="item-name" style="font-size:13px">${e.subject||'(sem assunto)'}</div><div class="item-meta">📬 ${e.display||e.account} · ${e.from_name||e.from_addr||'—'}</div><div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">${tg}</div></div></div></div>`;
+}
+function rEmail(d){document.getElementById('le').innerHTML=d.length?d.map(emailCard).join(''):emp('Nenhum email registrado hoje');}
+function sEmail(q){if(!q){rEmail(_e);return;}const lo=q.toLowerCase();rEmail(_e.filter(e=>(e.subject||'').toLowerCase().includes(lo)||(e.from_name||'').toLowerCase().includes(lo)));}
+
+function waCard(m){return`<div class="item-card"><div class="item-card-top"><div style="flex:1"><div class="item-name" style="font-size:13px">${m.sender_name||m.sender_num||'—'}</div><div class="item-meta">📱 ${m.bridge_name} · ${m.is_group?'Grupo':'DM'}</div><div class="item-meta" style="margin-top:4px;font-style:italic">"${(m.body||'').substring(0,80)}"</div></div></div></div>`;}
+function rWA(d){document.getElementById('lw').innerHTML=d.length?d.map(waCard).join(''):emp('Nenhuma mensagem registrada');}
+function fWA(v,c){chip(c);rWA(v==='all'?_w:_w.filter(m=>m.bridge_name===v));}
+
+function emp(m){return`<div class="empty"><div class="empty-icon">📭</div><p>${m}</p></div>`;}
+function chip(c){if(!c)return;c.closest('.filter-row')?.querySelectorAll('.filter-chip').forEach(x=>x.classList.remove('active'));c.classList.add('active');}
+
+(async()=>{
+  if(!TK){return;}
+  try{
+    const r=await fetch(`${API}/auth/me`,{headers:{authorization:'Bearer '+TK}});
+    if(r.ok){const d=await r.json();setUser(d.user);showApp();loadAll();setInterval(loadAll,60000);}
+    else{TK='';localStorage.removeItem('newb_token');}
+  }catch{}
+})();
 </script>
 </body>
 </html>
