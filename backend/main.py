@@ -10,7 +10,9 @@ import sqlite3
 import json
 from datetime import datetime
 
-DB_PATH = "/opt/data/newb_api/newb.db"
+DB_PATH    = "/opt/data/newb_api/newb.db"
+LOG_DB     = "/opt/data/newb_log.db"
+
 app = FastAPI(title="NewB Seguros API", version="1.0.0")
 
 app.add_middleware(
@@ -59,6 +61,25 @@ def get_stats():
         },
     }
     db.close()
+
+    # Dados do logger (newb_log.db)
+    try:
+        log = sqlite3.connect(LOG_DB)
+        log.row_factory = sqlite3.Row
+        today = datetime.now().strftime("%Y-%m-%dT00:00:00")
+        stats["emails"]["hoje"] = log.execute(
+            "SELECT COUNT(*) FROM email_messages WHERE logged_at >= ?", (today,)
+        ).fetchone()[0]
+        stats["whatsapp"] = {
+            "hoje": log.execute(
+                "SELECT COUNT(*) FROM wa_messages WHERE logged_at >= ? AND from_me=0", (today,)
+            ).fetchone()[0],
+            "total": log.execute("SELECT COUNT(*) FROM wa_messages WHERE from_me=0").fetchone()[0],
+        }
+        log.close()
+    except Exception:
+        stats["whatsapp"] = {"hoje": 0, "total": 0}
+
     return stats
 
 # ── Cotações ──────────────────────────────────────────────────────
@@ -216,6 +237,56 @@ def list_emails(caixa: Optional[str] = None, lido: Optional[int] = None, limit: 
 @app.get("/api/health")
 def health():
     return {"status": "ok", "timestamp": datetime.now().isoformat()}
+
+# ── Log de Emails (newb_log.db) ───────────────────────────────────
+
+@app.get("/api/emails/log")
+def list_emails_log(
+    account: Optional[str] = None,
+    limit: int = Query(50, le=200),
+    today_only: bool = False
+):
+    try:
+        log = sqlite3.connect(LOG_DB)
+        log.row_factory = sqlite3.Row
+        q = "SELECT * FROM email_messages WHERE 1=1"
+        params = []
+        if account:
+            q += " AND account=?"; params.append(account)
+        if today_only:
+            q += " AND logged_at >= ?"; params.append(datetime.now().strftime("%Y-%m-%dT00:00:00"))
+        q += " ORDER BY logged_at DESC LIMIT ?"
+        params.append(limit)
+        rows = rows_to_list(log.execute(q, params).fetchall())
+        log.close()
+        return {"items": rows, "total": len(rows)}
+    except Exception:
+        return {"items": [], "total": 0}
+
+# ── Log de WhatsApp (newb_log.db) ─────────────────────────────────
+
+@app.get("/api/whatsapp/log")
+def list_wa_log(
+    bridge: Optional[str] = None,
+    limit: int = Query(50, le=200),
+    today_only: bool = False
+):
+    try:
+        log = sqlite3.connect(LOG_DB)
+        log.row_factory = sqlite3.Row
+        q = "SELECT * FROM wa_messages WHERE from_me=0"
+        params = []
+        if bridge:
+            q += " AND bridge_name=?"; params.append(bridge)
+        if today_only:
+            q += " AND logged_at >= ?"; params.append(datetime.now().strftime("%Y-%m-%dT00:00:00"))
+        q += " ORDER BY logged_at DESC LIMIT ?"
+        params.append(limit)
+        rows = rows_to_list(log.execute(q, params).fetchall())
+        log.close()
+        return {"items": rows, "total": len(rows)}
+    except Exception:
+        return {"items": [], "total": 0}
 
 if __name__ == "__main__":
     import uvicorn
